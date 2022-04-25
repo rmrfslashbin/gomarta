@@ -1,0 +1,9 @@
+logging:
+  level: debug
+apikey: xxxx
+bus:
+  gtfs:
+    vehicles: https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle
+    trips: https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate
+rail:
+  rest: http://developer.itsmarta.com/RealtimeTrain/RestServiceNextTrain/GetRealtimeArrivals?apikey=
