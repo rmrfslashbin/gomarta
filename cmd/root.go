@@ -64,7 +64,7 @@ func Execute() {
 func init() {
 	var err error
 	log = logrus.New()
-	log.SetLevel(logrus.InfoLevel)
+	log.SetLevel(logrus.DebugLevel)
 	log.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp: true,
 	})
@@ -90,7 +90,7 @@ func init() {
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	log.WithFields(logrus.Fields{
-		"himeConfigDir": homeConfigDir,
+		"config_file": path.Join(homeConfigDir, "config.yaml"),
 	}).Debug("initConfig")
 
 	if cfgFile != "" {
