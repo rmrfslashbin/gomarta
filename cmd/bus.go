@@ -91,6 +91,9 @@ func getBus() error {
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
 
 	feed := &gtfsrt.FeedMessage{}
 	if err := proto.Unmarshal(body, feed); err != nil {

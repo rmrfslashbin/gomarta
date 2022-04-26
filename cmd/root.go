@@ -91,7 +91,7 @@ func init() {
 func initConfig() {
 	log.WithFields(logrus.Fields{
 		"config_file": path.Join(homeConfigDir, "config.yaml"),
-	}).Debug("initConfig")
+	}).Debug("trying to read config file")
 
 	if cfgFile != "" {
 		// Use config file from the flag.
@@ -115,7 +115,9 @@ func initConfig() {
 			log.Warn("Error reading config file")
 		}
 	} else {
-		log.Debug("Using config file: ", viper.ConfigFileUsed())
+		log.WithFields(logrus.Fields{
+			"config_file": viper.ConfigFileUsed(),
+		}).Debug("Using config file")
 	}
 
 	switch viper.GetString("logging.level") {
