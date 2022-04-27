@@ -124,7 +124,7 @@ type Trip struct {
 	BikesAllowed bool   `json:"bikes_allowed"`
 }
 
-func MakePair(k1, k2 int64) int64 {
+func EncodePair(k1, k2 int64) int64 {
 	return (k1*k1+k1)/2 + k2
 }
 
@@ -198,7 +198,7 @@ func (c *CalendarDate) Add(record []string) (*int64, error) {
 		return nil, fmt.Errorf("exception_type: %v", err)
 	}
 
-	pair := MakePair(int64(c.ServiceId), int64(c.Date.Unix()))
+	pair := EncodePair(int64(c.ServiceId), int64(c.Date.Unix()))
 	return &pair, nil
 }
 
@@ -253,7 +253,7 @@ func (s *Shape) Add(record []string) (*int64, error) {
 		return nil, fmt.Errorf("shape id: %v", err)
 	}
 
-	pair := MakePair(int64(s.Id), int64(s.Sequence))
+	pair := EncodePair(int64(s.Id), int64(s.Sequence))
 	return &pair, nil
 
 	// Encode
@@ -298,7 +298,7 @@ func (s *StopTime) Add(record []string) (*int64, error) {
 		return nil, fmt.Errorf("timepoint: %v", err)
 	}
 
-	pair := MakePair(int64(s.TripId), int64(s.StopSequence))
+	pair := EncodePair(int64(s.TripId), int64(s.StopSequence))
 	return &pair, nil
 }
 
