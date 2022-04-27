@@ -17,6 +17,7 @@
 # Ignore source data txt files and output data files
 *.txt
 *.gz
+data/
 
 # Ignore vscode stuff
 .vscode/

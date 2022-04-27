@@ -10,16 +10,62 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/rmrfslashbin/gomarta/pkg/gtfspec"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
+
+const MAX_RECORDS = 2000
+
+type StopTimes struct {
+	stopTimes []*gtfspec.StopTime
+}
+
+type Shapes struct {
+	shapes []*gtfspec.Shape
+}
+
+func NewShapes() *Shapes {
+	return &Shapes{
+		shapes: make([]*gtfspec.Shape, 0, MAX_RECORDS),
+	}
+}
+
+func (s *Shapes) Add(shape *gtfspec.Shape) {
+	s.shapes = append(s.shapes, shape)
+	if len(s.shapes) > MAX_RECORDS {
+		db.Create(s.shapes)
+		s.shapes = make([]*gtfspec.Shape, 0, MAX_RECORDS)
+	}
+}
+
+func (s *Shapes) Flush() {
+	db.Create(s.shapes)
+}
+
+func NewStopTimes() *StopTimes {
+	return &StopTimes{
+		stopTimes: make([]*gtfspec.StopTime, 0, MAX_RECORDS),
+	}
+}
+
+func (s *StopTimes) Add(stopTime *gtfspec.StopTime) {
+	s.stopTimes = append(s.stopTimes, stopTime)
+	if len(s.stopTimes) > MAX_RECORDS {
+		db.Create(s.stopTimes)
+		s.stopTimes = make([]*gtfspec.StopTime, 0, MAX_RECORDS)
+	}
+}
+
+func (s *StopTimes) Flush() {
+	db.Create(s.stopTimes)
+}
 
 // updateSpecsCmd represents the updateSpecs command
 var updateSpecsCmd = &cobra.Command{
@@ -49,7 +95,8 @@ to quickly create a Cobra application.`,
 	},
 }
 
-var data gtfspec.Data
+// var data gtfspec.Data
+var db *gorm.DB
 
 func init() {
 	rootCmd.AddCommand(updateSpecsCmd)
@@ -82,27 +129,27 @@ func updateSpecs() error {
 		"dataDir": dataDir,
 	}).Debug("dataDir")
 
-	data = gtfspec.Data{}
-	data.Agencies = make(map[string]*gtfspec.Agency, 0)
-	data.Calendars = make(map[int]*gtfspec.Calendar, 0)
-	data.CalendarDates = make(map[int64]*gtfspec.CalendarDate, 0)
-	data.Routes = make(map[int]*gtfspec.Route, 0)
-	data.Shapes = make(map[int64]*gtfspec.Shape, 0)
-	data.StopTimes = make(map[int64]*gtfspec.StopTime, 0)
-	data.Stops = make(map[int]*gtfspec.Stop, 0)
-	data.Trips = make(map[int]*gtfspec.Trip, 0)
+	sqliteDBFile := filepath.Join(dataDir, "gtfs.db")
+	os.Remove(sqliteDBFile)
+
+	db, err = gorm.Open(sqlite.Open(sqliteDBFile), &gorm.Config{})
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+	db.AutoMigrate(
+		&gtfspec.Agency{},
+		&gtfspec.Calendar{},
+		&gtfspec.CalendarDate{},
+		&gtfspec.Route{},
+		&gtfspec.Shape{},
+		&gtfspec.StopTime{},
+		&gtfspec.Stop{},
+		&gtfspec.Trip{},
+	)
 
 	if err := filepath.Walk(dataDir, processFile); err != nil {
 		return err
 	}
-
-	dataFile := path.Join(dataDir, "data.gob.gz")
-	if err := data.Write(dataFile); err != nil {
-		return err
-	}
-	log.WithFields(logrus.Fields{
-		"dataFile": dataFile,
-	}).Info("wrote data file")
 
 	return nil
 }
@@ -139,10 +186,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if id, err := agency.Add(record); err != nil {
+			if err := agency.Add(record); err != nil {
 				return err
 			} else {
-				data.Agencies[*id] = agency
+				db.Create(agency)
 			}
 			count++
 		}
@@ -164,10 +211,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if serviceId, err := calendar.Add(record); err != nil {
+			if err := calendar.Add(record); err != nil {
 				return err
 			} else {
-				data.Calendars[*serviceId] = calendar
+				db.Create(calendar)
 				count++
 			}
 		}
@@ -189,12 +236,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if hash, err := calendarDate.Add(record); err != nil {
+			if err := calendarDate.Add(record); err != nil {
 				return err
 			} else {
-				fmt.Println(hash)
-				spew.Dump(calendarDate)
-				data.CalendarDates[*hash] = calendarDate
+				db.Create(calendarDate)
 				count++
 			}
 		}
@@ -216,10 +261,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if routeId, err := route.Add(record); err != nil {
+			if err := route.Add(record); err != nil {
 				return err
 			} else {
-				data.Routes[*routeId] = route
+				db.Create(route)
 				count++
 			}
 		}
@@ -231,6 +276,7 @@ func processFile(path string, info os.FileInfo, err error) error {
 	case "shapes.txt":
 		log.Info("parsing shapes.txt")
 		startTime := time.Now()
+		s := NewShapes()
 		count := 0
 		for {
 			shape := &gtfspec.Shape{}
@@ -241,13 +287,14 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if shapeId, err := shape.Add(record); err != nil {
+			if err := shape.Add(record); err != nil {
 				return err
 			} else {
-				data.Shapes[*shapeId] = shape
+				s.Add(shape)
 				count++
 			}
 		}
+		s.Flush()
 		log.WithFields(logrus.Fields{
 			"records": count,
 			"elapsed": time.Since(startTime),
@@ -257,6 +304,7 @@ func processFile(path string, info os.FileInfo, err error) error {
 		log.Info("parsing stop_times.txt")
 		startTime := time.Now()
 		count := 0
+		st := NewStopTimes()
 		for {
 			stopTime := &gtfspec.StopTime{}
 			record, err := r.Read()
@@ -266,14 +314,14 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if hash, err := stopTime.Add(record); err != nil {
+			if err := stopTime.Add(record); err != nil {
 				return err
 			} else {
-				data.StopTimes[*hash] = stopTime
+				st.Add(stopTime)
 				count++
 			}
-
 		}
+		st.Flush()
 		log.WithFields(logrus.Fields{
 			"elapsed": time.Since(startTime),
 			"records": count,
@@ -292,10 +340,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if stopId, err := stop.Add(record); err != nil {
+			if err := stop.Add(record); err != nil {
 				return err
 			} else {
-				data.Stops[*stopId] = stop
+				db.Create(stop)
 				count++
 			}
 		}
@@ -317,10 +365,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if tripId, err := trip.Add(record); err != nil {
+			if err := trip.Add(record); err != nil {
 				return err
 			} else {
-				data.Trips[*tripId] = trip
+				db.Create(trip)
 				count++
 			}
 		}
