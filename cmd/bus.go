@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rmrfslashbin/gomarta/pkg/gtfsrt"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -99,8 +100,10 @@ func getBus() error {
 	if err := proto.Unmarshal(body, feed); err != nil {
 		return err
 	}
+
 	for _, entity := range feed.GetEntity() {
-		entity.GetVehicle()
+		spew.Dump(entity)
+		break
 	}
 
 	return nil

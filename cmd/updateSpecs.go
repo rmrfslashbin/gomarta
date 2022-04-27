@@ -81,14 +81,14 @@ func updateSpecs() error {
 	}).Debug("dataDir")
 
 	data = gtfspec.Data{}
-	data.Agencies = make([]gtfspec.Agency, 0)
-	data.Calendars = make([]gtfspec.Calendar, 0)
-	data.CalendarDates = make([]gtfspec.CalendarDate, 0)
-	data.Routes = make([]gtfspec.Route, 0)
-	data.Shapes = make([]gtfspec.Shape, 0)
-	data.StopTimes = make([]gtfspec.StopTime, 0)
-	data.Stops = make([]gtfspec.Stop, 0)
-	data.Trips = make([]gtfspec.Trip, 0)
+	data.Agencies = make(map[string]*gtfspec.Agency, 0)
+	data.Calendars = make(map[int]*gtfspec.Calendar, 0)
+	data.CalendarDates = make(map[int]*gtfspec.CalendarDate, 0)
+	data.Routes = make(map[int]*gtfspec.Route, 0)
+	data.Shapes = make(map[int]*gtfspec.Shape, 0)
+	data.StopTimes = make(map[int]*gtfspec.StopTime, 0)
+	data.Stops = make(map[int]*gtfspec.Stop, 0)
+	data.Trips = make(map[int]*gtfspec.Trip, 0)
 
 	if err := filepath.Walk(dataDir, processFile); err != nil {
 		return err
@@ -137,10 +137,11 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if err := agency.Add(record); err != nil {
+			if id, err := agency.Add(record); err != nil {
 				return err
+			} else {
+				data.Agencies[*id] = agency
 			}
-			data.Agencies = append(data.Agencies, *agency)
 			count++
 		}
 		log.WithFields(logrus.Fields{
@@ -161,11 +162,12 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if err := calendar.Add(record); err != nil {
+			if serviceId, err := calendar.Add(record); err != nil {
 				return err
+			} else {
+				data.Calendars[*serviceId] = calendar
+				count++
 			}
-			data.Calendars = append(data.Calendars, *calendar)
-			count++
 		}
 		log.WithFields(logrus.Fields{
 			"records": count,
@@ -185,16 +187,18 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if err := calendarDate.Add(record); err != nil {
+			if id, err := calendarDate.Add(record); err != nil {
 				return err
+			} else {
+				data.CalendarDates[*id] = calendarDate
+				count++
 			}
-			data.CalendarDates = append(data.CalendarDates, *calendarDate)
-			count++
 		}
 		log.WithFields(logrus.Fields{
 			"records": count,
 			"elapsed": time.Since(startTime),
 		}).Debug("parsed calendar_dates.txt")
+
 	case "routes.txt":
 		log.Info("parsing routes.txt")
 		route := &gtfspec.Route{}
@@ -208,11 +212,12 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if err := route.Add(record); err != nil {
+			if routeId, err := route.Add(record); err != nil {
 				return err
+			} else {
+				data.Routes[*routeId] = route
+				count++
 			}
-			data.Routes = append(data.Routes, *route)
-			count++
 		}
 		log.WithFields(logrus.Fields{
 			"records": count,
@@ -232,11 +237,12 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if err := shape.Add(record); err != nil {
+			if shapeId, err := shape.Add(record); err != nil {
 				return err
+			} else {
+				data.Shapes[*shapeId] = shape
+				count++
 			}
-			data.Shapes = append(data.Shapes, *shape)
-			count++
 		}
 		log.WithFields(logrus.Fields{
 			"records": count,
@@ -256,11 +262,13 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if err := stopTime.Add(record); err != nil {
+			if hash, err := stopTime.Add(record); err != nil {
 				return err
+			} else {
+				data.StopTimes[*hash] = stopTime
+				count++
 			}
-			data.StopTimes = append(data.StopTimes, *stopTime)
-			count++
+
 		}
 		log.WithFields(logrus.Fields{
 			"elapsed": time.Since(startTime),
@@ -280,16 +288,18 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if err := stop.Add(record); err != nil {
+			if stopId, err := stop.Add(record); err != nil {
 				return err
+			} else {
+				data.Stops[*stopId] = stop
+				count++
 			}
-			data.Stops = append(data.Stops, *stop)
-			count++
 		}
 		log.WithFields(logrus.Fields{
 			"elapsed": time.Since(startTime),
 			"records": count,
 		}).Debug("parsed stops.txt")
+
 	case "trips.txt":
 		log.Info("parsing trips.txt")
 		trip := &gtfspec.Trip{}
@@ -303,11 +313,12 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if err := trip.Add(record); err != nil {
+			if tripId, err := trip.Add(record); err != nil {
 				return err
+			} else {
+				data.Trips[*tripId] = trip
+				count++
 			}
-			data.Trips = append(data.Trips, *trip)
-			count++
 		}
 		log.WithFields(logrus.Fields{
 			"elapsed": time.Since(startTime),
