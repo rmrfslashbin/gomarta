@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rmrfslashbin/gomarta/pkg/gtfspec"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -85,6 +86,8 @@ func validateSpecs() error {
 	fmt.Printf("stop_times: %d\n", len(data.StopTimes))
 	fmt.Printf("stops: %d\n", len(data.Stops))
 	fmt.Printf("trips: %d\n", len(data.Trips))
+
+	spew.Dump(data.Routes)
 
 	return nil
 }

@@ -13,14 +13,14 @@ import (
 )
 
 type Data struct {
-	Agencies      map[string]*Agency    `json:"agencies"`
-	Calendars     map[int]*Calendar     `json:"calendars"`
-	CalendarDates map[int]*CalendarDate `json:"calendar_dates"`
-	Routes        map[int]*Route        `json:"routes"`
-	Shapes        map[int]*Shape        `json:"shapes"`
-	StopTimes     map[int]*StopTime     `json:"stop_times"`
-	Stops         map[int]*Stop         `json:"stops"`
-	Trips         map[int]*Trip         `json:"trips"`
+	Agencies      map[string]*Agency      `json:"agencies"`
+	Calendars     map[int]*Calendar       `json:"calendars"`
+	CalendarDates map[int64]*CalendarDate `json:"calendar_dates"`
+	Routes        map[int]*Route          `json:"routes"`
+	Shapes        map[int64]*Shape        `json:"shapes"`
+	StopTimes     map[int64]*StopTime     `json:"stop_times"`
+	Stops         map[int]*Stop           `json:"stops"`
+	Trips         map[int]*Trip           `json:"trips"`
 }
 
 // agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone,agency_fare_url
@@ -51,6 +51,7 @@ type Calendar struct {
 // service_id,date,exception_type
 // 34,20220530,1
 type CalendarDate struct {
+	ServiceId     int       `json:"service_id"`
 	Date          time.Time `json:"date"`
 	ExceptionType int       `json:"exception_type"`
 }
@@ -123,6 +124,16 @@ type Trip struct {
 	BikesAllowed bool   `json:"bikes_allowed"`
 }
 
+func MakePair(k1, k2 int64) int64 {
+	return (k1*k1+k1)/2 + k2
+}
+
+func DecodePair(pair int64) (int64, int64) {
+	k1 := (pair - (pair & 1)) / 2
+	k2 := pair - k1*(k1+1)/2 - 1
+	return k1, k2
+}
+
 func (a *Agency) Add(record []string) (*string, error) {
 	var err error
 
@@ -175,20 +186,20 @@ func (c *Calendar) Add(record []string) (*int, error) {
 	}
 }
 
-func (c *CalendarDate) Add(record []string) (*int, error) {
+func (c *CalendarDate) Add(record []string) (*int64, error) {
 	var err error
+	if c.ServiceId, err = strconv.Atoi(record[0]); err != nil {
+		return nil, fmt.Errorf("service_id: %v", err)
+	}
 	if c.Date, err = time.Parse("20060102", record[1]); err != nil {
 		return nil, fmt.Errorf("date: %v", err)
 	}
 	if c.ExceptionType, err = strconv.Atoi(record[2]); err != nil {
 		return nil, fmt.Errorf("exception_type: %v", err)
 	}
-	if serviceId, err := strconv.Atoi(record[0]); err != nil {
-		return nil, fmt.Errorf("service_id: %v", err)
-	} else {
-		return &serviceId, nil
-	}
 
+	pair := MakePair(int64(c.ServiceId), int64(c.Date.Unix()))
+	return &pair, nil
 }
 
 func (r *Route) Add(record []string) (*int, error) {
@@ -223,7 +234,7 @@ func (r *Route) Add(record []string) (*int, error) {
 	}
 }
 
-func (s *Shape) Add(record []string) (*int, error) {
+func (s *Shape) Add(record []string) (*int64, error) {
 	var err error
 
 	if s.Lat, err = strconv.ParseFloat(record[1], 64); err != nil {
@@ -242,15 +253,20 @@ func (s *Shape) Add(record []string) (*int, error) {
 		return nil, fmt.Errorf("shape id: %v", err)
 	}
 
-	// Encode
-	pair := s.Id + s.Sequence
-	pair = pair * (pair + 1)
-	pair = pair / 2
-	pair = pair + s.Sequence
+	pair := MakePair(int64(s.Id), int64(s.Sequence))
 	return &pair, nil
+
+	// Encode
+	/*
+		pair := s.Id + s.Sequence
+		pair = pair * (pair + 1)
+		pair = pair / 2
+		pair = pair + s.Sequence
+		return &pair, nil
+	*/
 }
 
-func (s *StopTime) Add(record []string) (*int, error) {
+func (s *StopTime) Add(record []string) (*int64, error) {
 	var err error
 	s.ArrivalTime = record[1]
 	s.DepartureTime = record[2]
@@ -282,26 +298,8 @@ func (s *StopTime) Add(record []string) (*int, error) {
 		return nil, fmt.Errorf("timepoint: %v", err)
 	}
 
-	// cantor pairing
-	// https://github.com/mnhkahn/pairing/blob/master/pairing.go
-
-	// Encode
-	pair := s.TripId + s.StopId
-	pair = pair * (pair + 1)
-	pair = pair / 2
-	pair = pair + s.StopId
+	pair := MakePair(int64(s.TripId), int64(s.StopSequence))
 	return &pair, nil
-
-	// Decode
-	/*
-		w := math.Floor((math.Sqrt(float64(8*pair+1)) - 1) / 2)
-		t := (w*w + w) / 2
-
-		k2 := pair - uint64(t)
-		k1 := uint64(w) - k2
-		return k1, k2
-	*/
-
 }
 
 func (s *Stop) Add(record []string) (*int, error) {

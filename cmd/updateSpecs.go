@@ -7,12 +7,14 @@ package cmd
 import (
 	"encoding/csv"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rmrfslashbin/gomarta/pkg/gtfspec"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -83,10 +85,10 @@ func updateSpecs() error {
 	data = gtfspec.Data{}
 	data.Agencies = make(map[string]*gtfspec.Agency, 0)
 	data.Calendars = make(map[int]*gtfspec.Calendar, 0)
-	data.CalendarDates = make(map[int]*gtfspec.CalendarDate, 0)
+	data.CalendarDates = make(map[int64]*gtfspec.CalendarDate, 0)
 	data.Routes = make(map[int]*gtfspec.Route, 0)
-	data.Shapes = make(map[int]*gtfspec.Shape, 0)
-	data.StopTimes = make(map[int]*gtfspec.StopTime, 0)
+	data.Shapes = make(map[int64]*gtfspec.Shape, 0)
+	data.StopTimes = make(map[int64]*gtfspec.StopTime, 0)
 	data.Stops = make(map[int]*gtfspec.Stop, 0)
 	data.Trips = make(map[int]*gtfspec.Trip, 0)
 
@@ -126,10 +128,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 	switch info.Name() {
 	case "agency.txt":
 		log.Info("parsing agency.txt")
-		agency := &gtfspec.Agency{}
 		startTime := time.Now()
 		count := 0
 		for {
+			agency := &gtfspec.Agency{}
 			record, err := r.Read()
 			if err != nil {
 				if err == io.EOF {
@@ -151,10 +153,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 
 	case "calendar.txt":
 		log.Info("parsing calendar.txt")
-		calendar := &gtfspec.Calendar{}
 		startTime := time.Now()
 		count := 0
 		for {
+			calendar := &gtfspec.Calendar{}
 			record, err := r.Read()
 			if err != nil {
 				if err == io.EOF {
@@ -176,10 +178,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 
 	case "calendar_dates.txt":
 		log.Info("parsing calendar_dates.txt")
-		calendarDate := &gtfspec.CalendarDate{}
 		startTime := time.Now()
 		count := 0
 		for {
+			calendarDate := &gtfspec.CalendarDate{}
 			record, err := r.Read()
 			if err != nil {
 				if err == io.EOF {
@@ -187,10 +189,12 @@ func processFile(path string, info os.FileInfo, err error) error {
 				}
 				return err
 			}
-			if id, err := calendarDate.Add(record); err != nil {
+			if hash, err := calendarDate.Add(record); err != nil {
 				return err
 			} else {
-				data.CalendarDates[*id] = calendarDate
+				fmt.Println(hash)
+				spew.Dump(calendarDate)
+				data.CalendarDates[*hash] = calendarDate
 				count++
 			}
 		}
@@ -201,10 +205,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 
 	case "routes.txt":
 		log.Info("parsing routes.txt")
-		route := &gtfspec.Route{}
 		startTime := time.Now()
 		count := 0
 		for {
+			route := &gtfspec.Route{}
 			record, err := r.Read()
 			if err != nil {
 				if err == io.EOF {
@@ -226,10 +230,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 
 	case "shapes.txt":
 		log.Info("parsing shapes.txt")
-		shape := &gtfspec.Shape{}
 		startTime := time.Now()
 		count := 0
 		for {
+			shape := &gtfspec.Shape{}
 			record, err := r.Read()
 			if err != nil {
 				if err == io.EOF {
@@ -251,10 +255,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 
 	case "stop_times.txt":
 		log.Info("parsing stop_times.txt")
-		stopTime := &gtfspec.StopTime{}
 		startTime := time.Now()
 		count := 0
 		for {
+			stopTime := &gtfspec.StopTime{}
 			record, err := r.Read()
 			if err != nil {
 				if err == io.EOF {
@@ -277,10 +281,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 
 	case "stops.txt":
 		log.Info("parsing stops.txt")
-		stop := &gtfspec.Stop{}
 		startTime := time.Now()
 		count := 0
 		for {
+			stop := &gtfspec.Stop{}
 			record, err := r.Read()
 			if err != nil {
 				if err == io.EOF {
@@ -302,10 +306,10 @@ func processFile(path string, info os.FileInfo, err error) error {
 
 	case "trips.txt":
 		log.Info("parsing trips.txt")
-		trip := &gtfspec.Trip{}
 		startTime := time.Now()
 		count := 0
 		for {
+			trip := &gtfspec.Trip{}
 			record, err := r.Read()
 			if err != nil {
 				if err == io.EOF {
