@@ -77,7 +77,7 @@ func init() {
 }
 
 func getBus() error {
-	url := viper.GetString("bus.gtfs.vehicles")
+	url := viper.GetString("gtfs.bus.vehicles")
 	if url == "" {
 		return errors.New("vehicles URL is empty- check the config file")
 	}

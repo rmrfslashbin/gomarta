@@ -1,15 +1,17 @@
 /*
 Copyright © 2022 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/csv"
-	"errors"
 	"fmt"
-	"io"
+	"io/ioutil"
+	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -70,13 +72,8 @@ func (s *StopTimes) Flush() {
 // updateSpecsCmd represents the updateSpecs command
 var updateSpecsCmd = &cobra.Command{
 	Use:   "updateSpecs",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Update the GTFS specs",
+	Long:  "Update the GTFS specs to include changes made to the GTFS spec such as routes, time tables, routes, etc",
 	Run: func(cmd *cobra.Command, args []string) {
 		// Catch errors
 		var err error
@@ -111,25 +108,31 @@ func init() {
 	// is called directly, e.g.:
 	// updateSpecsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-	updateSpecsCmd.Flags().String("datadir", "", "The directory containing the GTFS files")
+	updateSpecsCmd.Flags().String("datadir", "", "The directory containing the GTFS database")
 	viper.BindPFlag("datadir", updateSpecsCmd.Flags().Lookup("data"))
 }
 
 func updateSpecs() error {
-	if viper.GetString("datadir") == "" {
-		return errors.New("datadir directory not set")
-	}
+	var dataDir string
+	var err error
 
-	dataDir, err := filepath.Abs(viper.GetString("datadir"))
-	if err != nil {
-		return err
+	if viper.GetString("datadir") != "" {
+		dataDir, err = filepath.Abs(viper.GetString("datadir"))
+		if err != nil {
+			return err
+		}
+	} else {
+		userDir, err := os.UserConfigDir()
+		if err != nil {
+			return err
+		}
+		dataDir = path.Join(userDir, "gomarta")
 	}
-
-	log.WithFields(logrus.Fields{
-		"dataDir": dataDir,
-	}).Debug("dataDir")
 
 	sqliteDBFile := filepath.Join(dataDir, "gtfs.db")
+	log.WithFields(logrus.Fields{
+		"sqliteDBFile": sqliteDBFile,
+	}).Debug("GTFS Spec sqliteDBFile")
 	os.Remove(sqliteDBFile)
 
 	db, err = gorm.Open(sqlite.Open(sqliteDBFile), &gorm.Config{})
@@ -147,235 +150,207 @@ func updateSpecs() error {
 		&gtfspec.Trip{},
 	)
 
-	if err := filepath.Walk(dataDir, processFile); err != nil {
+	if err := processZipData(); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func processFile(path string, info os.FileInfo, err error) error {
+func readZipFile(zf *zip.File) ([]byte, error) {
+	f, err := zf.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return ioutil.ReadAll(f)
+}
+
+func processZipData() error {
+	specURL := viper.GetString("gtfs.specs")
+	if specURL == "" {
+		return fmt.Errorf("no spec URL provided")
+	}
+	resp, err := http.Get(specURL)
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
-	if info.IsDir() {
-		return nil
-	}
-
-	fh, err := os.Open(path)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-	defer fh.Close()
-
-	r := csv.NewReader(fh)
-	_, _ = r.Read() // Skip header
-
-	switch info.Name() {
-	case "agency.txt":
-		log.Info("parsing agency.txt")
-		startTime := time.Now()
-		count := 0
-		for {
-			agency := &gtfspec.Agency{}
-			record, err := r.Read()
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				return err
-			}
-			if err := agency.Add(record); err != nil {
-				return err
-			} else {
-				db.Create(agency)
-			}
-			count++
+	zipReader, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, file := range zipReader.File {
+		zipData, err := readZipFile(file)
+		if err != nil {
+			return err
 		}
-		log.WithFields(logrus.Fields{
-			"records": count,
-			"elapsed": time.Since(startTime),
-		}).Debug("parsed agency.txt")
-
-	case "calendar.txt":
-		log.Info("parsing calendar.txt")
-		startTime := time.Now()
-		count := 0
-		for {
-			calendar := &gtfspec.Calendar{}
-			record, err := r.Read()
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				return err
-			}
-			if err := calendar.Add(record); err != nil {
-				return err
-			} else {
-				db.Create(calendar)
-				count++
-			}
+		csvData, err := csv.NewReader(bytes.NewReader(zipData)).ReadAll()
+		if err != nil {
+			return err
 		}
-		log.WithFields(logrus.Fields{
-			"records": count,
-			"elapsed": time.Since(startTime),
-		}).Debug("parsed calendar.txt")
 
-	case "calendar_dates.txt":
-		log.Info("parsing calendar_dates.txt")
-		startTime := time.Now()
-		count := 0
-		for {
-			calendarDate := &gtfspec.CalendarDate{}
-			record, err := r.Read()
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				return err
-			}
-			if err := calendarDate.Add(record); err != nil {
-				return err
-			} else {
-				db.Create(calendarDate)
-				count++
-			}
-		}
-		log.WithFields(logrus.Fields{
-			"records": count,
-			"elapsed": time.Since(startTime),
-		}).Debug("parsed calendar_dates.txt")
+		switch file.Name {
+		case "agency.txt":
+			log.Info("parsing agency.txt")
+			count := 0
+			startTime := time.Now()
 
-	case "routes.txt":
-		log.Info("parsing routes.txt")
-		startTime := time.Now()
-		count := 0
-		for {
-			route := &gtfspec.Route{}
-			record, err := r.Read()
-			if err != nil {
-				if err == io.EOF {
-					break
+			for _, row := range csvData[1:] {
+				agency := &gtfspec.Agency{}
+				if err := agency.Add(row); err != nil {
+					return err
+				} else {
+					db.Create(agency)
+					count++
 				}
-				return err
 			}
-			if err := route.Add(record); err != nil {
-				return err
-			} else {
-				db.Create(route)
-				count++
-			}
-		}
-		log.WithFields(logrus.Fields{
-			"records": count,
-			"elapsed": time.Since(startTime),
-		}).Debug("parsed routes.txt")
+			log.WithFields(logrus.Fields{
+				"records": count,
+				"elapsed": time.Since(startTime),
+			}).Debug("parsed agency.txt")
 
-	case "shapes.txt":
-		log.Info("parsing shapes.txt")
-		startTime := time.Now()
-		s := NewShapes()
-		count := 0
-		for {
-			shape := &gtfspec.Shape{}
-			record, err := r.Read()
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				return err
-			}
-			if err := shape.Add(record); err != nil {
-				return err
-			} else {
-				s.Add(shape)
-				count++
-			}
-		}
-		s.Flush()
-		log.WithFields(logrus.Fields{
-			"records": count,
-			"elapsed": time.Since(startTime),
-		}).Debug("parsed shapes.txt")
+		case "calendar.txt":
+			log.Info("parsing calendar.txt")
+			count := 0
+			startTime := time.Now()
 
-	case "stop_times.txt":
-		log.Info("parsing stop_times.txt")
-		startTime := time.Now()
-		count := 0
-		st := NewStopTimes()
-		for {
-			stopTime := &gtfspec.StopTime{}
-			record, err := r.Read()
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				return err
-			}
-			if err := stopTime.Add(record); err != nil {
-				return err
-			} else {
-				st.Add(stopTime)
-				count++
-			}
-		}
-		st.Flush()
-		log.WithFields(logrus.Fields{
-			"elapsed": time.Since(startTime),
-			"records": count,
-		}).Debug("parsed stop_times.txt")
+			for _, row := range csvData[1:] {
+				calendar := &gtfspec.Calendar{}
 
-	case "stops.txt":
-		log.Info("parsing stops.txt")
-		startTime := time.Now()
-		count := 0
-		for {
-			stop := &gtfspec.Stop{}
-			record, err := r.Read()
-			if err != nil {
-				if err == io.EOF {
-					break
+				if err := calendar.Add(row); err != nil {
+					return err
+				} else {
+					db.Create(calendar)
+					count++
 				}
-				return err
 			}
-			if err := stop.Add(record); err != nil {
-				return err
-			} else {
-				db.Create(stop)
-				count++
-			}
-		}
-		log.WithFields(logrus.Fields{
-			"elapsed": time.Since(startTime),
-			"records": count,
-		}).Debug("parsed stops.txt")
+			log.WithFields(logrus.Fields{
+				"records": count,
+				"elapsed": time.Since(startTime),
+			}).Debug("parsed calendar.txt")
 
-	case "trips.txt":
-		log.Info("parsing trips.txt")
-		startTime := time.Now()
-		count := 0
-		for {
-			trip := &gtfspec.Trip{}
-			record, err := r.Read()
-			if err != nil {
-				if err == io.EOF {
-					break
+		case "calendar_dates.txt":
+			log.Info("parsing calendar_dates.txt")
+			startTime := time.Now()
+			count := 0
+
+			for _, row := range csvData[1:] {
+				calendarDate := &gtfspec.CalendarDate{}
+
+				if err := calendarDate.Add(row); err != nil {
+					return err
+				} else {
+					db.Create(calendarDate)
+					count++
 				}
-				return err
 			}
-			if err := trip.Add(record); err != nil {
-				return err
-			} else {
-				db.Create(trip)
-				count++
+			log.WithFields(logrus.Fields{
+				"records": count,
+				"elapsed": time.Since(startTime),
+			}).Debug("parsed calendar_dates.txt")
+
+		case "routes.txt":
+			log.Info("parsing routes.txt")
+			startTime := time.Now()
+			count := 0
+
+			for _, row := range csvData[1:] {
+				route := &gtfspec.Route{}
+				if err := route.Add(row); err != nil {
+					return err
+				} else {
+					db.Create(route)
+					count++
+				}
 			}
+			log.WithFields(logrus.Fields{
+				"records": count,
+				"elapsed": time.Since(startTime),
+			}).Debug("parsed routes.txt")
+
+		case "shapes.txt":
+			log.Info("parsing shapes.txt")
+			s := NewShapes()
+			startTime := time.Now()
+			count := 0
+
+			for _, row := range csvData[1:] {
+				shape := &gtfspec.Shape{}
+				if err := shape.Add(row); err != nil {
+					return err
+				} else {
+					s.Add(shape)
+					count++
+				}
+			}
+			s.Flush()
+			log.WithFields(logrus.Fields{
+				"records": count,
+				"elapsed": time.Since(startTime),
+			}).Debug("parsed shapes.txt")
+
+		case "stop_times.txt":
+			log.Info("parsing stop_times.txt")
+			startTime := time.Now()
+			count := 0
+			st := NewStopTimes()
+			for _, row := range csvData[1:] {
+				stopTime := &gtfspec.StopTime{}
+				if err := stopTime.Add(row); err != nil {
+					return err
+				} else {
+					st.Add(stopTime)
+					count++
+				}
+			}
+			st.Flush()
+			log.WithFields(logrus.Fields{
+				"elapsed": time.Since(startTime),
+				"records": count,
+			}).Debug("parsed stop_times.txt")
+
+		case "stops.txt":
+			log.Info("parsing stops.txt")
+			startTime := time.Now()
+			count := 0
+			for _, row := range csvData[1:] {
+				stop := &gtfspec.Stop{}
+				if err := stop.Add(row); err != nil {
+					return err
+				} else {
+					db.Create(stop)
+					count++
+				}
+			}
+			log.WithFields(logrus.Fields{
+				"elapsed": time.Since(startTime),
+				"records": count,
+			}).Debug("parsed stops.txt")
+
+		case "trips.txt":
+			log.Info("parsing trips.txt")
+			startTime := time.Now()
+			count := 0
+			for _, row := range csvData[1:] {
+				trip := &gtfspec.Trip{}
+				if err := trip.Add(row); err != nil {
+					return err
+				} else {
+					db.Create(trip)
+					count++
+				}
+			}
+			log.WithFields(logrus.Fields{
+				"elapsed": time.Since(startTime),
+				"records": count,
+			}).Debug("parsed trips.txt")
 		}
-		log.WithFields(logrus.Fields{
-			"elapsed": time.Since(startTime),
-			"records": count,
-		}).Debug("parsed trips.txt")
 	}
 	return nil
 }

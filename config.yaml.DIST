@@ -2,8 +2,9 @@ logging:
   level: debug
 datadir: ./data
 apikey: xxxx
-bus:
-  gtfs:
+gtfs:
+  specs: https://itsmarta.com/google_transit_feed/google_transit.zip
+  bus:
     vehicles: https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb
     trips: https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb
 rail:
