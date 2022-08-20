@@ -34,9 +34,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// busCmd represents the bus command
-var busCmd = &cobra.Command{
-	Use:   "bus",
+// tripCmd represents the trip command
+var tripCmd = &cobra.Command{
+	Use:   "trip",
 	Short: "A brief description of your command",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
@@ -54,7 +54,7 @@ to quickly create a Cobra application.`,
 				}).Fatal("main crashed")
 			}
 		}()
-		if err := getBus(); err != nil {
+		if err := getTrips(); err != nil {
 			log.WithFields(logrus.Fields{
 				"error": err,
 			}).Fatal("error")
@@ -63,27 +63,27 @@ to quickly create a Cobra application.`,
 }
 
 func init() {
-	rootCmd.AddCommand(busCmd)
+	rootCmd.AddCommand(tripCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// busCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// tripCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// busCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// tripCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func getBus() error {
-	url := viper.GetString("gtfs.bus.vehicles")
+func getTrips() error {
+	url := viper.GetString("gtfs.bus.trips")
 	if url == "" {
-		return errors.New("vehicles URL is empty- check the config file")
+		return errors.New("trips URL is empty- check the config file")
 	}
 	log.WithFields(logrus.Fields{
 		"url": url,
-	}).Debug("getting bus data")
+	}).Debug("getting trip data")
 
 	resp, err := http.Get(url)
 	if err != nil {
