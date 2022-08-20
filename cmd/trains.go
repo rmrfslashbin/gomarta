@@ -31,16 +31,11 @@ import (
 	"github.com/spf13/viper"
 )
 
-// trainsCmd represents the trip command
+// trainsCmd represents the train command
 var trainsCmd = &cobra.Command{
 	Use:   "train",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Fetch current train data",
+	Long:  "Fetch current train arrival data from the Marta API",
 	Run: func(cmd *cobra.Command, args []string) {
 		// Catch errors
 		var err error
@@ -59,29 +54,27 @@ to quickly create a Cobra application.`,
 	},
 }
 
+// init initializes the command.
 func init() {
+	// Add subcommand to the root command.
 	rootCmd.AddCommand(trainsCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// trainsCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// trainsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
+// getTrains fetches train data from the Marta API.
 func getTrains() error {
+	// Get URL or bail out.
 	url := viper.GetString("rail.rest")
 	if url == "" {
 		return errors.New("rail.rest URL is empty- check the config file")
 	}
+
+	// Get the train data.
 	trains, err := trains.GetTrains(url, log)
 	if err != nil {
 		return err
 	}
+
+	// Print the train data.
 	for _, train := range *trains {
 		fmt.Printf("Destination: %s\n", train.Destination)
 		fmt.Printf("Direction: %s\n", train.GetDirection())
@@ -93,5 +86,6 @@ func getTrains() error {
 		fmt.Printf("Wait time: %s\n", train.NextArrival.Sub(train.EventTime))
 		fmt.Println("")
 	}
+
 	return nil
 }

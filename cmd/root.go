@@ -40,16 +40,8 @@ var (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "gomarta",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Short: "Fetch and parse data from the MARTA API",
+	Long:  "Fetch and parse train and bus data from the MARTA API.",
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -61,6 +53,7 @@ func Execute() {
 	}
 }
 
+// init initializes the root command.
 func init() {
 	var err error
 	log = logrus.New()
@@ -69,22 +62,16 @@ func init() {
 		FullTimestamp: true,
 	})
 
-	// Find home directory.
+	// Find user's config directory.
 	homeConfigDir, err = os.UserConfigDir()
 	cobra.CheckErr(err)
+	// Assume the config subdir is called "gomarta".
 	homeConfigDir = path.Join(homeConfigDir, "gomarta")
 
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
+	// Add "config" switch to root command.
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", fmt.Sprintf("config file (default is %s/config.yaml)", homeConfigDir))
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -120,6 +107,7 @@ func initConfig() {
 		}).Debug("Using config file")
 	}
 
+	// Set up log level.
 	switch viper.GetString("logging.level") {
 	case "debug":
 		log.SetLevel(logrus.DebugLevel)

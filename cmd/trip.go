@@ -23,15 +23,12 @@ package cmd
 
 import (
 	"errors"
-	"io"
-	"net/http"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/rmrfslashbin/gomarta/pkg/gtfsrt"
+	"github.com/rmrfslashbin/gomarta/pkg/buses"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"google.golang.org/protobuf/proto"
 )
 
 // tripCmd represents the trip command
@@ -81,30 +78,14 @@ func getTrips() error {
 	if url == "" {
 		return errors.New("trips URL is empty- check the config file")
 	}
-	log.WithFields(logrus.Fields{
-		"url": url,
-	}).Debug("getting trip data")
 
-	resp, err := http.Get(url)
+	trips, err := buses.GetTrips(url, log)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	spew.Dump(body)
-
-	feed := &gtfsrt.FeedMessage{}
-	if err := proto.Unmarshal(body, feed); err != nil {
-		return err
-	}
-
-	for _, entity := range feed.GetEntity() {
-		spew.Dump(entity)
-		break
+	for _, trip := range trips {
+		spew.Dump(trip)
 	}
 
 	return nil
