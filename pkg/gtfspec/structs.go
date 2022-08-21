@@ -13,21 +13,20 @@ import (
 // agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone,agency_fare_url
 // MARTA,Metropolitan Atlanta Rapid Transit Authority,https://www.itsmarta.com,America/New_York,en,404-848-5000,https://www.itsmarta.com/fare-programs.aspx
 type Agency struct {
-	AgencyId  string `json:"agency_id" gorm:"primary_key"`
-	Name      string `json:"agency_name"`
-	Url       string `json:"agency_url"`
-	Timezone  string `json:"agency_timezone"`
-	Lang      string `json:"agency_lang"`
-	Phone     string `json:"agency_phone"`
-	FareUrl   string `json:"agency_fare_url"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	gorm.Model
+	AgencyId string `json:"agency_id" gorm:"primary_key"`
+	Name     string `json:"agency_name"`
+	Url      string `json:"agency_url"`
+	Timezone string `json:"agency_timezone"`
+	Lang     string `json:"agency_lang"`
+	Phone    string `json:"agency_phone"`
+	FareUrl  string `json:"agency_fare_url"`
 }
 
 // service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date
 // 20,0,0,0,0,0,0,0,20220423,20220812
 type Calendar struct {
+	gorm.Model
 	ServiceId int       `json:"service_id" gorm:"primary_key"`
 	Monday    int       `json:"monday"`
 	Tuesday   int       `json:"tuesday"`
@@ -38,26 +37,22 @@ type Calendar struct {
 	Sunday    int       `json:"sunday"`
 	StartDate time.Time `json:"start_date"`
 	EndDate   time.Time `json:"end_date"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
 // service_id,date,exception_type
 // 34,20220530,1
 type CalendarDate struct {
+	gorm.Model
 	ServiceId     int       `json:"service_id" gorm:"primary_key"`
 	Date          time.Time `json:"date" gorm:"primary_key"`
 	ExceptionType int       `json:"exception_type"`
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	DeletedAt     gorm.DeletedAt `gorm:"index"`
 }
 
 // route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color
 // 16883,MARTA,1,Marietta Blvd/Joseph E Lowery Blvd,,3,https://itsmarta.com/1.aspx,FF00FF,000000
 type Route struct {
-	RouteId   int     `json:"route_id" gorm:"primary_key"`
+	gorm.Model
+	RouteID   int     `json:"route_id" gorm:"primary_key"`
 	AgencyId  string  `json:"agency_id"`
 	ShortName string  `json:"route_short_name"`
 	LongName  string  `json:"route_long_name"`
@@ -66,27 +61,23 @@ type Route struct {
 	Url       string  `json:"route_url"`
 	Color     []uint8 `json:"route_color"`
 	TextColor []uint8 `json:"route_text_color"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
 // shape_id,shape_pt_lat,shape_pt_lon,shape_pt_sequence,shape_dist_traveled
 // 100095,33.818860,-84.450519,1,0.0000
 type Shape struct {
-	ShapeId   int     `json:"shape_id" gorm:"primary_key"`
-	Lat       float64 `json:"shape_pt_lat"`
-	Lon       float64 `json:"shape_pt_lon"`
-	Sequence  int     `json:"shape_pt_sequence" gorm:"primary_key"`
-	Distance  float64 `json:"shape_dist_traveled"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	gorm.Model
+	ShapeId  int     `json:"shape_id" gorm:"primary_key"`
+	Lat      float64 `json:"shape_pt_lat"`
+	Lon      float64 `json:"shape_pt_lon"`
+	Sequence int     `json:"shape_pt_sequence" gorm:"primary_key"`
+	Distance float64 `json:"shape_dist_traveled"`
 }
 
 // trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,pickup_type,drop_off_type,shape_dist_traveled,timepoint
 // 7142673, 6:43:00, 6:43:00,27,1,,0,0,,1
 type StopTime struct {
+	gorm.Model
 	TripId            int     `json:"trip_id" gorm:"primary_key"`
 	ArrivalTime       string  `json:"arrival_time"`
 	DepartureTime     string  `json:"departure_time"`
@@ -97,14 +88,12 @@ type StopTime struct {
 	DropOffType       int     `json:"drop_off_type"`
 	ShapeDistTraveled float64 `json:"shape_dist_traveled"`
 	Timepoint         int     `json:"timepoint"`
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	DeletedAt         gorm.DeletedAt `gorm:"index"`
 }
 
 // stop_id,stop_code,stop_name,stop_desc,stop_lat,stop_lon,zone_id,stop_url,location_type,parent_station,stop_timezone,wheelchair_boarding
 // 27,907933,HAMILTON E HOLMES STATION,70 HAMILTON E HOLMES DR NW & CSX TRANSPORTATION,33.754553,-84.469302,,,,,,1
 type Stop struct {
+	gorm.Model
 	StopId             int     `json:"stop_id" gorm:"primary_key"`
 	Code               int     `json:"stop_code"`
 	Name               string  `json:"stop_name"`
@@ -117,17 +106,15 @@ type Stop struct {
 	ParentStation      string  `json:"parent_station"`
 	Timezone           string  `json:"stop_timezone"`
 	WheelchairBoarding bool    `json:"wheelchair_boarding"`
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
 
 // route_id,service_id,trip_id,trip_headsign,trip_short_name,direction_id,block_id,shape_id,wheelchair_accessible,bikes_allowed
 // 17114,2,7142675,BLUE EASTBOUND TO INDIAN CREEK STATION,,0,1075016,100750,0,0
 type Trip struct {
+	gorm.Model
 	RouteId      int    `json:"route_id"`
 	ServiceId    int    `json:"service_id"`
-	TripId       int    `json:"trip_id" gorm:"primary_key"`
+	TripID       int    `json:"trip_id" gorm:"primary_key"`
 	Headsign     string `json:"trip_headsign"`
 	ShortName    string `json:"trip_short_name"`
 	DirectionId  int    `json:"direction_id"`
@@ -135,6 +122,49 @@ type Trip struct {
 	ShapeId      int    `json:"shape_id"`
 	Wheelchair   bool   `json:"wheelchair_accessible"`
 	BikesAllowed bool   `json:"bikes_allowed"`
+}
+
+/*
+id:"1602"
+
+	vehicle:{
+		trip:{
+			trip_id:"7118032"
+			route_id:"17051"
+			start_date:"20220820"
+			}
+		vehicle:{
+			id:"2302"
+			label:"1602"
+		}
+		position:{
+			latitude:33.74004
+			longitude:-84.33842
+			bearing:90
+		}
+		timestamp:1661039730
+		occupancy_status:MANY_SEATS_AVAILABLE
+	}
+*/
+type Position struct {
+	Latitude  float32 `json:"latitude"`
+	Longitude float32 `json:"longitude"`
+	Bearing   float32 `json:"bearing"`
+}
+
+type VehiclePosition struct {
+	gorm.Model
+	ID              string `json:"id" gorm:"primary_key"`
+	VehicleID       string `json:"vehicle"`
+	VehicleLabel    string `json:"vehicle_label"`
+	TripID          int
+	Trip            Trip
+	RouteID         int
+	Route           Route
+	TripStartDate   string   `json:"start_date"`
+	Position        Position `gorm:"embedded;embeddedPrefix:pos_"`
+	Timestamp       uint64   `json:"timestamp"`
+	OccupancyStatus string   `json:"occupancy_status"`
 }
 
 func (a *Agency) Add(record []string) error {
@@ -210,7 +240,7 @@ func (r *Route) Add(record []string) error {
 	r.Desc = record[4]
 	r.Url = record[6]
 
-	if r.RouteId, err = strconv.Atoi(record[0]); err != nil {
+	if r.RouteID, err = strconv.Atoi(record[0]); err != nil {
 		return fmt.Errorf("route id: %v", err)
 	}
 	if r.Type, err = strconv.Atoi(record[5]); err != nil {
@@ -358,7 +388,7 @@ func (t *Trip) Add(record []string) error {
 	} else {
 		t.BikesAllowed = false
 	}
-	if t.TripId, err = strconv.Atoi(record[2]); err != nil {
+	if t.TripID, err = strconv.Atoi(record[2]); err != nil {
 		return fmt.Errorf("trip id: %v", err)
 	}
 	return nil

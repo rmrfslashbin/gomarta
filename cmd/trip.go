@@ -79,13 +79,15 @@ func getTrips() error {
 		return errors.New("trips URL is empty- check the config file")
 	}
 
-	trips, err := buses.GetTrips(url, log)
+	trips, err := buses.GetData(url, log)
 	if err != nil {
 		return err
 	}
 
 	for _, trip := range trips {
-		spew.Dump(trip)
+		//spew.Dump(trip)
+		spew.Dump(trip.GetAlert().GetDescriptionText().String())
+
 	}
 
 	return nil

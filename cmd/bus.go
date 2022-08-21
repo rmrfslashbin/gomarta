@@ -23,15 +23,20 @@ package cmd
 
 import (
 	"errors"
-	"io"
-	"net/http"
+	"fmt"
+	"os"
+	"path"
+	"path/filepath"
+	"strconv"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/rmrfslashbin/gomarta/pkg/gtfsrt"
+	"github.com/rmrfslashbin/gomarta/pkg/buses"
+	"github.com/rmrfslashbin/gomarta/pkg/gtfspec"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"google.golang.org/protobuf/proto"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // busCmd represents the bus command
@@ -54,7 +59,7 @@ to quickly create a Cobra application.`,
 				}).Fatal("main crashed")
 			}
 		}()
-		if err := getBus(); err != nil {
+		if err := getBuses(); err != nil {
 			log.WithFields(logrus.Fields{
 				"error": err,
 			}).Fatal("error")
@@ -76,35 +81,87 @@ func init() {
 	// busCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func getBus() error {
+func getBuses() error {
+	userDir, err := os.UserConfigDir()
+	if err != nil {
+		return err
+	}
+	dataDir := path.Join(userDir, "gomarta")
+	sqliteDBFile := filepath.Join(dataDir, "gtfs.db")
+	if _, err := os.Stat(sqliteDBFile); os.IsNotExist(err) {
+		return errors.New("sqlite database does not exist")
+	}
+	log.WithFields(logrus.Fields{
+		"sqliteDBFile": sqliteDBFile,
+	}).Debug("GTFS Spec sqliteDBFile")
+	db, err := gorm.Open(sqlite.Open(sqliteDBFile), &gorm.Config{})
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+
+	if err := db.AutoMigrate(
+		&gtfspec.Agency{},
+		&gtfspec.Calendar{},
+		&gtfspec.CalendarDate{},
+		&gtfspec.Route{},
+		&gtfspec.Shape{},
+		&gtfspec.StopTime{},
+		&gtfspec.Stop{},
+		&gtfspec.Trip{},
+		&gtfspec.VehiclePosition{},
+	); err != nil {
+		return fmt.Errorf("failed to migrate database: %v", err)
+	}
+
 	url := viper.GetString("gtfs.bus.vehicles")
 	if url == "" {
 		return errors.New("vehicles URL is empty- check the config file")
 	}
-	log.WithFields(logrus.Fields{
-		"url": url,
-	}).Debug("getting bus data")
 
-	resp, err := http.Get(url)
+	vehicles, err := buses.GetData(url, log)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	spew.Dump(body)
+	for _, vehicle := range vehicles {
+		vp := gtfspec.VehiclePosition{}
 
-	feed := &gtfsrt.FeedMessage{}
-	if err := proto.Unmarshal(body, feed); err != nil {
-		return err
-	}
+		spew.Dump(vehicle)
+		routeId, err := strconv.Atoi(*vehicle.Vehicle.Trip.RouteId)
+		if err != nil {
+			return err
+		}
+		//route := gtfspec.Route{RouteId: routeId}
 
-	for _, entity := range feed.GetEntity() {
-		spew.Dump(entity)
+		tripId, err := strconv.Atoi(*vehicle.Vehicle.Trip.TripId)
+		if err != nil {
+			return err
+		}
+
+		vp.ID = vehicle.GetId()
+		vp.VehicleID = vehicle.GetVehicle().Vehicle.GetId()
+		vp.VehicleLabel = vehicle.GetVehicle().Vehicle.GetLabel()
+		vp.TripID = tripId
+		vp.RouteID = routeId
+		vp.TripStartDate = vehicle.GetVehicle().Trip.GetStartDate()
+		vp.Position.Bearing = vehicle.GetVehicle().Position.GetBearing()
+		vp.Position.Latitude = vehicle.GetVehicle().Position.GetLatitude()
+		vp.Position.Longitude = vehicle.GetVehicle().Position.GetLongitude()
+		vp.Timestamp = vehicle.GetVehicle().GetTimestamp()
+		vp.OccupancyStatus = vehicle.GetVehicle().GetOccupancyStatus().String()
+		db.Create(&vp)
+
+		/*
+			trip := gtfspec.Trip{TripId: tripId}
+			db.First(&route)
+			db.First(&trip)
+			fmt.Println()
+			spew.Dump(route)
+			spew.Dump(trip)
+		*/
+		spew.Dump(vp)
 		break
+
 	}
 
 	return nil

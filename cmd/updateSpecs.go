@@ -139,7 +139,8 @@ func updateSpecs() error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %v", err)
 	}
-	db.AutoMigrate(
+
+	if err := db.AutoMigrate(
 		&gtfspec.Agency{},
 		&gtfspec.Calendar{},
 		&gtfspec.CalendarDate{},
@@ -148,7 +149,10 @@ func updateSpecs() error {
 		&gtfspec.StopTime{},
 		&gtfspec.Stop{},
 		&gtfspec.Trip{},
-	)
+		&gtfspec.VehiclePosition{},
+	); err != nil {
+		return fmt.Errorf("failed to migrate database: %v", err)
+	}
 
 	if err := processZipData(); err != nil {
 		return err
