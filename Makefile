@@ -1,6 +1,10 @@
 .DEFAULT_GOAL := default
 
 protoc:
+	# https://developers.google.com/transit/gtfs-realtime/
+	# https://developers.google.com/static/transit/gtfs-realtime/gtfs-realtime.proto
+	# Add to proto file:
+	#   option go_package = "github.com/rmrfslashbin/gomarta/pkg/gtfsrt";
 	@echo "Building protobufs"
 	@protoc --go_out=. --go_opt=paths=source_relative pkg/gtfsrt/gtfs-realtime.proto
 

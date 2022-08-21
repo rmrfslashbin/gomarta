@@ -29,7 +29,6 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/rmrfslashbin/gomarta/pkg/buses"
 	"github.com/rmrfslashbin/gomarta/pkg/gtfspec"
 	"github.com/sirupsen/logrus"
@@ -123,10 +122,11 @@ func getBuses() error {
 		return err
 	}
 
+	count := 0
 	for _, vehicle := range vehicles {
 		vp := gtfspec.VehiclePosition{}
 
-		spew.Dump(vehicle)
+		//spew.Dump(vehicle)
 		routeId, err := strconv.Atoi(*vehicle.Vehicle.Trip.RouteId)
 		if err != nil {
 			return err
@@ -159,10 +159,13 @@ func getBuses() error {
 			spew.Dump(route)
 			spew.Dump(trip)
 		*/
-		spew.Dump(vp)
-		break
-
+		//spew.Dump(vp)
+		//break
+		count++
 	}
+	log.WithFields(logrus.Fields{
+		"count": count,
+	}).Debug("vehicles")
 
 	return nil
 }

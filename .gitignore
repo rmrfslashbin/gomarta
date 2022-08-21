@@ -22,3 +22,6 @@ data/
 
 # Ignore vscode stuff
 .vscode/
+
+# Ignore bak files
+*.bak
