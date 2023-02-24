@@ -5,17 +5,24 @@ import (
 	"net/http"
 
 	"github.com/rmrfslashbin/gomarta/pkg/gtfsrt"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/proto"
 )
 
-// GetData gets the current bus data from the API.
-func GetData(url string, log *logrus.Logger) ([]*gtfsrt.FeedEntity, error) {
-	log.WithFields(logrus.Fields{
-		"url": url,
-	}).Debug("getting requested data")
+type Input struct {
+	Url string
+	Log *zerolog.Logger
+}
 
-	resp, err := http.Get(url)
+// GetData gets the current bus data from the API.
+func GetData(input *Input) ([]*gtfsrt.FeedEntity, error) {
+	log.Debug().
+		Str("url", input.Url).
+		Str("function", "pkg/buses.GetData()").
+		Msg("getting requested data")
+
+	resp, err := http.Get(input.Url)
 	if err != nil {
 		return nil, err
 	}
@@ -25,18 +32,22 @@ func GetData(url string, log *logrus.Logger) ([]*gtfsrt.FeedEntity, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.WithFields(logrus.Fields{
-		"body": len(body),
-	}).Debug("got bus data from endpoint")
+	log.Debug().
+		Str("url", input.Url).
+		Str("function", "pkg/buses.GetData()").
+		Str("body", string(body)).
+		Msg("fetched data from API")
 
 	feed := &gtfsrt.FeedMessage{}
 	if err := proto.Unmarshal(body, feed); err != nil {
 		return nil, err
 	}
 
-	log.WithFields(logrus.Fields{
-		"items": len(feed.GetEntity()),
-	}).Debug("parsed bus data from protobuf")
+	log.Debug().
+		Str("url", input.Url).
+		Str("function", "pkg/buses.GetData()").
+		Int("itmes", len(feed.GetEntity())).
+		Msg("unmarshalled protobuf data")
 
 	return feed.GetEntity(), nil
 }

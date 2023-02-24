@@ -26,7 +26,6 @@ syntax = "proto2";
 
 package transit_realtime;
 
-option go_package = "github.com/rmrfslashbin/gomarta/pkg/gtfsrt";
 option java_package = "com.google.transit.realtime";
 
 // The contents of a feed message.

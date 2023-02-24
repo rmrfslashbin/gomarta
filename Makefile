@@ -6,10 +6,11 @@ protoc:
 	# Add to proto file:
 	#   option go_package = "github.com/rmrfslashbin/gomarta/pkg/gtfsrt";
 	@echo "Building protobufs"
-	@protoc --go_out=. --go_opt=paths=source_relative pkg/gtfsrt/gtfs-realtime.proto
+	@curl -s -o pkg/gtfsrt/gtfs-realtime.proto  https://developers.google.com/static/transit/gtfs-realtime/gtfs-realtime.proto 
+	@protoc --go_opt=Mpkg/gtfsrt/gtfs-realtime.proto=github.com/rmrfslashbin/gomarta/pkg/gtfsrt --go_out=. --go_opt=paths=source_relative pkg/gtfsrt/gtfs-realtime.proto
 
 
-build:
+build: protoc
 	@if [ ! -d "./bin" ]; then mkdir bin; fi
 	@go build -o bin .
 
