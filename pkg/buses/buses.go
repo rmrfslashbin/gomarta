@@ -32,7 +32,7 @@ func GetData(input *Input) ([]*gtfsrt.FeedEntity, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Debug().
+	log.Trace().
 		Str("url", input.Url).
 		Str("function", "pkg/buses.GetData()").
 		Str("body", string(body)).

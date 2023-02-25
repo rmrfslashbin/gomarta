@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -27,8 +28,8 @@ type Context struct {
 
 // ConfigSetCmd sets a config value
 type BusCmd struct {
-	Vehicles string `name:"vehicles" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle" help:"URL for the Marta Bus Vehicles GTFS endpoint."`
-	Trips    string `name:"trips" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate" help:"URL for the Marta Bus Trips GTFS endpoint."`
+	Vehicles string `name:"vehicles" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb" help:"URL for the Marta Bus Vehicles GTFS endpoint."`
+	Trips    string `name:"trips" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb" help:"URL for the Marta Bus Trips GTFS endpoint."`
 }
 
 // Run is the entry point for the BusCmd command
@@ -42,9 +43,42 @@ func (r *BusCmd) Run(ctx *Context) error {
 	}
 
 	for _, vehicle := range vehicles {
+		fmt.Println(*vehicle.Id)
+		fmt.Println(vehicle.Vehicle.GetTimestamp())
+		fmt.Println(vehicle.Vehicle.GetOccupancyStatus())
+
+		fmt.Println(*vehicle.Vehicle.GetPosition().Latitude)
+		fmt.Println(*vehicle.Vehicle.GetPosition().Longitude)
+		fmt.Println(*vehicle.Vehicle.GetPosition().Bearing)
+		fmt.Println(*vehicle.Vehicle.GetPosition().Speed)
+
+		fmt.Println(vehicle.Vehicle.GetVehicle().GetId())
+		fmt.Println(vehicle.Vehicle.GetVehicle().GetLabel())
+
+		fmt.Println(vehicle.Vehicle.GetTrip().GetTripId())
+		fmt.Println(vehicle.Vehicle.GetTrip().GetRouteId())
+		fmt.Println(vehicle.Vehicle.GetTrip().GetDirectionId())
+		fmt.Println(vehicle.Vehicle.GetTrip().GetStartDate())
 		spew.Dump(vehicle)
+		break
 	}
 
+	/*
+		fmt.Println("=====================================")
+
+		trips, err := buses.GetData(&buses.Input{
+			Url: r.Trips,
+			Log: ctx.log,
+		})
+		if err != nil {
+			return err
+		}
+
+		for _, trip := range trips {
+			spew.Dump(trip)
+			break
+		}
+	*/
 	return nil
 }
 
