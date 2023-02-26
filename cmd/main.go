@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/mmcloughlin/geohash"
 	"github.com/rmrfslashbin/gomarta/pkg/bus"
 	"github.com/rmrfslashbin/gomarta/pkg/gtfspec"
 	"github.com/rs/zerolog"
@@ -34,6 +32,7 @@ type BusCmd struct {
 	TripsUrl    string `name:"tripsurl" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb" help:"URL for the Marta Bus Trips GTFS endpoint."`
 	Vehicles    bool   `name:"vehicles" group:"fetch" help:"Fetch the vehicles."`
 	Trips       bool   `name:"trips" group:"fetch" help:"Fetch the trips."`
+	Gob         string `name:"gob" default:"data.gob" help:"Output the specs as Gob to a file."`
 }
 
 // Run is the entry point for the BusCmd command
@@ -42,7 +41,17 @@ func (r *BusCmd) Run(ctx *Context) error {
 		return fmt.Errorf("must specify at least one of --vehicles or --trips")
 	}
 
-	b, err := bus.New(bus.WithLogger(ctx.log), bus.WithTripsUrl(r.TripsUrl), bus.WithVehiclesUrl(r.VehiclesUrl))
+	gobfqdn := filepath.Clean(r.Gob)
+	specData, err := gtfspec.FromGOBFile(gobfqdn)
+	if err != nil {
+		return err
+	}
+
+	b, err := bus.New(
+		bus.WithLogger(ctx.log),
+		bus.WithSpecs(specData),
+		bus.WithTripsUrl(r.TripsUrl),
+		bus.WithVehiclesUrl(r.VehiclesUrl))
 	if err != nil {
 		return err
 	}
@@ -55,62 +64,18 @@ func (r *BusCmd) Run(ctx *Context) error {
 		return err
 	}
 
-	type Vehicle struct {
-		Id string
-
-		EpochTimestamp  uint64
-		Timestamp       time.Time
-		OccupancyStatus string
-
-		Latitude  float32
-		Longitude float32
-		Bearing   float32
-		Speed     float32
-		Geohash   string
-
-		VehicleId    string
-		VehicleLabel string
-
-		TripId        string
-		RouteId       string
-		DirectionId   uint32
-		TripStartDate string
-	}
-
 	for _, vehicle := range data.Vehicles {
-		v := &Vehicle{}
-
-		v.Id = *vehicle.Id
-
-		v.EpochTimestamp = vehicle.Vehicle.GetTimestamp()
-		v.OccupancyStatus = vehicle.Vehicle.GetOccupancyStatus().String()
-
-		v.Latitude = *vehicle.Vehicle.GetPosition().Latitude
-		v.Longitude = *vehicle.Vehicle.GetPosition().Longitude
-		v.Bearing = *vehicle.Vehicle.GetPosition().Bearing
-		if vehicle.Vehicle.GetPosition().Speed != nil {
-			v.Speed = *vehicle.Vehicle.GetPosition().Speed
-		}
-
-		v.Geohash = geohash.Encode(float64(v.Latitude), float64(v.Longitude))
-
-		v.VehicleId = vehicle.Vehicle.GetVehicle().GetId()
-		v.VehicleLabel = vehicle.Vehicle.GetVehicle().GetLabel()
-
-		v.TripId = vehicle.Vehicle.GetTrip().GetTripId()
-		v.RouteId = vehicle.Vehicle.GetTrip().GetRouteId()
-		v.DirectionId = vehicle.Vehicle.GetTrip().GetDirectionId()
-		v.TripStartDate = vehicle.Vehicle.GetTrip().GetStartDate()
-
-		v.Timestamp = time.Unix(int64(v.EpochTimestamp), 0)
-
 		spew.Dump(vehicle)
-		spew.Dump(v)
 		break
 	}
 
 	for _, trip := range data.Trips {
-		spew.Dump(trip)
+		//spew.Dump(trip)
+		//fmt.Println()
+
+		
+		}
+
 		break
 	}
 

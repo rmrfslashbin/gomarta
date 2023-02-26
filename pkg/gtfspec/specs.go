@@ -103,6 +103,9 @@ func (s *Specs) AddTrip(tripData *TripData, trip *Trip) {
 	if s.Trips[tripData.TripId] == nil {
 		s.Trips[tripData.TripId] = make(map[int]*Trip, 0)
 	}
+	if _, ok := s.Trips[tripData.TripId][tripData.RouteId]; ok {
+		panic("Duplicate trip")
+	}
 	s.Trips[tripData.TripId][tripData.RouteId] = trip
 }
 
