@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/rmrfslashbin/gomarta/pkg/buses"
+	"github.com/mmcloughlin/geohash"
+	"github.com/rmrfslashbin/gomarta/pkg/bus"
 	"github.com/rmrfslashbin/gomarta/pkg/gtfspec"
 	"github.com/rs/zerolog"
 )
@@ -28,57 +30,90 @@ type Context struct {
 
 // ConfigSetCmd sets a config value
 type BusCmd struct {
-	Vehicles string `name:"vehicles" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb" help:"URL for the Marta Bus Vehicles GTFS endpoint."`
-	Trips    string `name:"trips" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb" help:"URL for the Marta Bus Trips GTFS endpoint."`
+	VehiclesUrl string `name:"vehiclesurl" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb" help:"URL for the Marta Bus Vehicles GTFS endpoint."`
+	TripsUrl    string `name:"tripsurl" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb" help:"URL for the Marta Bus Trips GTFS endpoint."`
+	Vehicles    bool   `name:"vehicles" group:"fetch" help:"Fetch the vehicles."`
+	Trips       bool   `name:"trips" group:"fetch" help:"Fetch the trips."`
 }
 
 // Run is the entry point for the BusCmd command
 func (r *BusCmd) Run(ctx *Context) error {
-	vehicles, err := buses.GetData(&buses.Input{
-		Url: r.Vehicles,
-		Log: ctx.log,
+	if !r.Vehicles && !r.Trips {
+		return fmt.Errorf("must specify at least one of --vehicles or --trips")
+	}
+
+	b, err := bus.New(bus.WithLogger(ctx.log), bus.WithTripsUrl(r.TripsUrl), bus.WithVehiclesUrl(r.VehiclesUrl))
+	if err != nil {
+		return err
+	}
+
+	data, err := b.Fetch(&bus.FetchInput{
+		Trips:    r.Trips,
+		Vehicles: r.Vehicles,
 	})
 	if err != nil {
 		return err
 	}
 
-	for _, vehicle := range vehicles {
-		fmt.Println(*vehicle.Id)
-		fmt.Println(vehicle.Vehicle.GetTimestamp())
-		fmt.Println(vehicle.Vehicle.GetOccupancyStatus())
+	type Vehicle struct {
+		Id string
 
-		fmt.Println(*vehicle.Vehicle.GetPosition().Latitude)
-		fmt.Println(*vehicle.Vehicle.GetPosition().Longitude)
-		fmt.Println(*vehicle.Vehicle.GetPosition().Bearing)
-		fmt.Println(*vehicle.Vehicle.GetPosition().Speed)
+		EpochTimestamp  uint64
+		Timestamp       time.Time
+		OccupancyStatus string
 
-		fmt.Println(vehicle.Vehicle.GetVehicle().GetId())
-		fmt.Println(vehicle.Vehicle.GetVehicle().GetLabel())
+		Latitude  float32
+		Longitude float32
+		Bearing   float32
+		Speed     float32
+		Geohash   string
 
-		fmt.Println(vehicle.Vehicle.GetTrip().GetTripId())
-		fmt.Println(vehicle.Vehicle.GetTrip().GetRouteId())
-		fmt.Println(vehicle.Vehicle.GetTrip().GetDirectionId())
-		fmt.Println(vehicle.Vehicle.GetTrip().GetStartDate())
+		VehicleId    string
+		VehicleLabel string
+
+		TripId        string
+		RouteId       string
+		DirectionId   uint32
+		TripStartDate string
+	}
+
+	for _, vehicle := range data.Vehicles {
+		v := &Vehicle{}
+
+		v.Id = *vehicle.Id
+
+		v.EpochTimestamp = vehicle.Vehicle.GetTimestamp()
+		v.OccupancyStatus = vehicle.Vehicle.GetOccupancyStatus().String()
+
+		v.Latitude = *vehicle.Vehicle.GetPosition().Latitude
+		v.Longitude = *vehicle.Vehicle.GetPosition().Longitude
+		v.Bearing = *vehicle.Vehicle.GetPosition().Bearing
+		if vehicle.Vehicle.GetPosition().Speed != nil {
+			v.Speed = *vehicle.Vehicle.GetPosition().Speed
+		}
+
+		v.Geohash = geohash.Encode(float64(v.Latitude), float64(v.Longitude))
+
+		v.VehicleId = vehicle.Vehicle.GetVehicle().GetId()
+		v.VehicleLabel = vehicle.Vehicle.GetVehicle().GetLabel()
+
+		v.TripId = vehicle.Vehicle.GetTrip().GetTripId()
+		v.RouteId = vehicle.Vehicle.GetTrip().GetRouteId()
+		v.DirectionId = vehicle.Vehicle.GetTrip().GetDirectionId()
+		v.TripStartDate = vehicle.Vehicle.GetTrip().GetStartDate()
+
+		v.Timestamp = time.Unix(int64(v.EpochTimestamp), 0)
+
 		spew.Dump(vehicle)
+		spew.Dump(v)
 		break
 	}
 
-	/*
-		fmt.Println("=====================================")
+	for _, trip := range data.Trips {
+		spew.Dump(trip)
+		break
+	}
 
-		trips, err := buses.GetData(&buses.Input{
-			Url: r.Trips,
-			Log: ctx.log,
-		})
-		if err != nil {
-			return err
-		}
-
-		for _, trip := range trips {
-			spew.Dump(trip)
-			break
-		}
-	*/
 	return nil
 }
 

@@ -15,6 +15,7 @@ require (
 require (
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/mmcloughlin/geohash v0.10.0 // indirect
 )
 
 require (
