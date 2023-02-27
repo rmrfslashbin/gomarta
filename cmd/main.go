@@ -3,12 +3,12 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/alecthomas/kong"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/rmrfslashbin/gomarta/pkg/bus"
-	"github.com/rmrfslashbin/gomarta/pkg/gtfspec"
+	"github.com/rmrfslashbin/gomarta/pkg/database"
+	"github.com/rmrfslashbin/gomarta/pkg/specsupdate"
 	"github.com/rs/zerolog"
 )
 
@@ -23,7 +23,10 @@ const (
 // Context is used to pass context/global configs to the commands
 type Context struct {
 	// log is the logger
-	log *zerolog.Logger
+	log    *zerolog.Logger
+	sqlite *string
+	mysql  *string
+	pgsql  *string
 }
 
 // ConfigSetCmd sets a config value
@@ -32,7 +35,6 @@ type BusCmd struct {
 	TripsUrl    string  `name:"tripsurl" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb" help:"URL for the Marta Bus Trips GTFS endpoint."`
 	Vehicles    bool    `name:"vehicles" group:"fetch" help:"Fetch the vehicles."`
 	Trips       bool    `name:"trips" group:"fetch" help:"Fetch the trips."`
-	Gob         string  `name:"gob" default:"data.gob" help:"Output the specs as Gob to a file."`
 	Route       *string `name:"route" help:"Route to fetch. (ex: 37)"`
 }
 
@@ -42,15 +44,19 @@ func (r *BusCmd) Run(ctx *Context) error {
 		return fmt.Errorf("must specify at least one of --vehicles or --trips")
 	}
 
-	gobfqdn := filepath.Clean(r.Gob)
-	specData, err := gtfspec.FromGOBFile(gobfqdn)
+	db, err := database.New(
+		database.WithLogger(ctx.log),
+		database.WithSqlite(ctx.sqlite),
+		database.WithMysql(ctx.mysql),
+		database.WithPgsql(ctx.pgsql),
+	)
 	if err != nil {
 		return err
 	}
 
 	b, err := bus.New(
+		bus.WithDatabase(db),
 		bus.WithLogger(ctx.log),
-		bus.WithSpecs(specData),
 		bus.WithTripsUrl(r.TripsUrl),
 		bus.WithVehiclesUrl(r.VehiclesUrl))
 	if err != nil {
@@ -95,40 +101,40 @@ func (r *BusCmd) Run(ctx *Context) error {
 
 // UpdateSpecsCmd updates the GTFS feed specs
 type UpdateSpecsCmd struct {
-	Url  string  `name:"url" default:"https://itsmarta.com/google_transit_feed/google_transit.zip" help:"URL the GTFS feed spec zip file."`
-	Json *string `name:"json" group:"output" required:"" xor:"output" help:"Output the specs as JSON to a file."`
-	Gob  *string `name:"gob" group:"output" required:"" xor:"output" help:"Output the specs as Gob to a file."`
+	Url string `name:"url" default:"https://itsmarta.com/google_transit_feed/google_transit.zip" help:"URL the GTFS feed spec zip file."`
 }
 
 // Run is the entry point for the UpdateSpecsCmd command
 func (r *UpdateSpecsCmd) Run(ctx *Context) error {
-	spec, err := gtfspec.Update(&gtfspec.Input{
-		Url: r.Url,
-		Log: ctx.log,
-	})
+	db, err := database.New(
+		database.WithLogger(ctx.log),
+		database.WithSqlite(ctx.sqlite),
+		database.WithMysql(ctx.mysql),
+		database.WithPgsql(ctx.pgsql),
+	)
 	if err != nil {
 		return err
 	}
-	if r.Json != nil {
-		fpqn := filepath.Clean(*r.Json)
-		if err := spec.ToJSONFile(fpqn); err != nil {
-			return err
-		}
-	}
-	if r.Gob != nil {
-		fpqn := filepath.Clean(*r.Gob)
-		if err := spec.ToGOBFile(fpqn); err != nil {
-			return err
-		}
+
+	spec, err := specsupdate.New(
+		specsupdate.WithDatabase(db),
+		specsupdate.WithLogger(ctx.log),
+		specsupdate.WithUrl(r.Url),
+	)
+	if err != nil {
+		return err
 	}
 
-	return nil
+	return spec.Update()
 }
 
 // CLI is the main CLI struct
 type CLI struct {
 	// Global flags/args
-	LogLevel string `name:"loglevel" env:"LOGLEVEL" default:"debug" enum:"panic,fatal,error,warn,info,debug,trace" help:"Set the log level."`
+	LogLevel string  `name:"loglevel" env:"LOGLEVEL" default:"debug" enum:"panic,fatal,error,warn,info,debug,trace" help:"Set the log level."`
+	Sqlite   *string `name:"sqlite" env:"SQLITE" group:"database" xor:"database" required:"" help:"SQLite database file."`
+	Mysql    *string `name:"mysql" env:"MYSQL" group:"database" xor:"database" required:"" help:"MySQL connection string."`
+	Pgsql    *string `name:"pgsql" env:"PGSQL" group:"database" xor:"database" required:"" help:"PostgreSQL connection string."`
 
 	Bus    BusCmd         `cmd:"" help:"Get bus data."`
 	Update UpdateSpecsCmd `cmd:"" help:"Update the GTFS feed specs."`
@@ -171,7 +177,12 @@ func main() {
 		Msg("starting up")
 
 	// Call the Run() method of the selected parsed command.
-	err = ctx.Run(&Context{log: &log})
+	err = ctx.Run(&Context{
+		log:    &log,
+		sqlite: cli.Sqlite,
+		mysql:  cli.Mysql,
+		pgsql:  cli.Pgsql,
+	})
 
 	// FatalIfErrorf terminates with an error message if err != nil
 	ctx.FatalIfErrorf(err)

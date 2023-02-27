@@ -4,14 +4,17 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"gorm.io/gorm"
 )
 
 // route_id,service_id,trip_id,trip_headsign,trip_short_name,direction_id,block_id,shape_id,wheelchair_accessible,bikes_allowed
 // 17114,2,7142675,BLUE EASTBOUND TO INDIAN CREEK STATION,,0,1075016,100750,0,0
 type Trip struct {
-	//RouteId      int    `json:"route_id"`
-	ServiceId int `json:"service_id"`
-	//TripID       int    `json:"trip_id" `
+	gorm.Model
+	RouteId      int    `json:"route_id" gorm:"primaryKey"`
+	ServiceId    int    `json:"service_id"`
+	TripID       int    `json:"trip_id" gorm:"primaryKey"`
 	Headsign     string `json:"trip_headsign"`
 	ShortName    string `json:"trip_short_name"`
 	DirectionId  int    `json:"direction_id"`
@@ -21,41 +24,34 @@ type Trip struct {
 	BikesAllowed bool   `json:"bikes_allowed"`
 }
 
-type TripData struct {
-	RouteId int
-	TripId  int
-}
-
-func (t *Trip) Add(record []string) (*TripData, error) {
+func (t *Trip) Add(record []string) error {
 	if len(record) != 10 {
-		return nil, fmt.Errorf("invalid trip record length: %d", len(record))
+		return fmt.Errorf("invalid trip record length: %d", len(record))
 	}
 
 	var err error
 	t.Headsign = strings.TrimSpace(record[3])
 	t.ShortName = strings.TrimSpace(record[4])
 
-	routeId, err := strconv.Atoi(record[0])
+	t.RouteId, err = strconv.Atoi(record[0])
 	if err != nil {
-		return nil, fmt.Errorf("route id: %v", err)
+		return fmt.Errorf("route id: %v", err)
 	}
-
-	tripID, err := strconv.Atoi(record[2])
+	t.TripID, err = strconv.Atoi(record[2])
 	if err != nil {
-		return nil, fmt.Errorf("trip id: %v", err)
+		return fmt.Errorf("trip id: %v", err)
 	}
-
 	if t.ServiceId, err = strconv.Atoi(record[1]); err != nil {
-		return nil, fmt.Errorf("service id: %v", err)
+		return fmt.Errorf("service id: %v", err)
 	}
 	if t.BlockId, err = strconv.Atoi(record[5]); err != nil {
-		return nil, fmt.Errorf("block id: %v", err)
+		return fmt.Errorf("block id: %v", err)
 	}
 	if t.DirectionId, err = strconv.Atoi(record[6]); err != nil {
-		return nil, fmt.Errorf("direction id: %v", err)
+		return fmt.Errorf("direction id: %v", err)
 	}
 	if t.ShapeId, err = strconv.Atoi(record[7]); err != nil {
-		return nil, fmt.Errorf("shape id: %v", err)
+		return fmt.Errorf("shape id: %v", err)
 	}
 	if strings.TrimSpace(record[8]) == "1" {
 		t.Wheelchair = true
@@ -68,8 +64,5 @@ func (t *Trip) Add(record []string) (*TripData, error) {
 		t.BikesAllowed = false
 	}
 
-	return &TripData{
-		RouteId: routeId,
-		TripId:  tripID,
-	}, nil
+	return nil
 }

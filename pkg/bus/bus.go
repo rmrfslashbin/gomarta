@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/mmcloughlin/geohash"
-	"github.com/rmrfslashbin/gomarta/pkg/gtfspec"
+	"github.com/rmrfslashbin/gomarta/pkg/database"
 	"github.com/rmrfslashbin/gomarta/pkg/gtfsrt"
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/proto"
@@ -20,9 +20,9 @@ type Option func(c *Bus)
 // Bus for the app instance
 type Bus struct {
 	log         *zerolog.Logger
+	db          *database.Database
 	VehiclesUrl string
 	TripsUrl    string
-	Specs       *gtfspec.Specs
 }
 
 // New creates a new mastoclinet instance
@@ -49,24 +49,24 @@ func New(opts ...Option) (*Bus, error) {
 		cfg.VehiclesUrl = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb"
 	}
 
-	if cfg.Specs == nil {
-		return nil, &ErrSpecsNotSet{}
+	if cfg.db == nil {
+		return nil, &ErrNoDatabase{}
 	}
 
 	return cfg, nil
+}
+
+// WithDatabase sets the database for the bus instance
+func WithDatabase(db *database.Database) Option {
+	return func(c *Bus) {
+		c.db = db
+	}
 }
 
 // WithLogger sets the logger for the bus instance
 func WithLogger(log *zerolog.Logger) Option {
 	return func(c *Bus) {
 		c.log = log
-	}
-}
-
-// WithSpecs sets the specs for the bus instance
-func WithSpecs(specs *gtfspec.Specs) Option {
-	return func(c *Bus) {
-		c.Specs = specs
 	}
 }
 
@@ -135,7 +135,7 @@ func (c *Bus) Fetch(input *FetchInput) (*FetchOutput, error) {
 
 						stu.StopSequence = stopTimeUpdate.GetStopSequence()
 						stu.StopId, _ = strconv.Atoi(stopTimeUpdate.GetStopId())
-						stu.Stop = c.Specs.Stops[stu.StopId]
+						stu.Stop, _ = c.db.GetStop(stu.StopId)
 
 						arrival := stopTimeUpdate.GetArrival()
 						if arrival != nil {
@@ -166,9 +166,12 @@ func (c *Bus) Fetch(input *FetchInput) (*FetchOutput, error) {
 						t.StartDate = tripDescriptor.GetStartDate()
 						t.StartTime = tripDescriptor.GetStartTime()
 
-						t.Route = c.Specs.GetRoute(t.RouteId)
-						t.Trip = c.Specs.GetTrip(t.TripId, t.RouteId)
-
+						if t.Route, err = c.db.GetRoute(t.RouteId); err != nil {
+							return nil, err
+						}
+						if t.Trip, err = c.db.GetTrip(t.TripId, t.RouteId); err != nil {
+							return nil, err
+						}
 					}
 
 					/* Vehicle info isn't provided
@@ -266,14 +269,21 @@ func (c *Bus) Fetch(input *FetchInput) (*FetchOutput, error) {
 					if trip != nil {
 						v.DirectionId = trip.GetDirectionId()
 						v.RouteId, _ = strconv.Atoi(trip.GetRouteId())
-						v.Route = c.Specs.GetRoute(v.RouteId)
-						v.Agency = c.Specs.GetAgency(v.Route.AgencyId) //c.Specs.Agencies[v.Route.AgencyId]
+						v.TripId, _ = strconv.Atoi(trip.GetTripId())
+						if v.Route, err = c.db.GetRoute(v.RouteId); err != nil {
+							return nil, err
+						}
+						if v.Trip, err = c.db.GetTrip(v.TripId, v.RouteId); err != nil {
+							return nil, err
+						}
+
+						if v.Agency, err = c.db.GetAgency(v.Route.AgencyId); err != nil {
+							return nil, err
+						}
 
 						v.ScheduleRelationship = trip.GetScheduleRelationship().String()
 						v.StartDate = trip.GetStartDate()
 						v.StartTime = trip.GetStartTime()
-						v.TripId, _ = strconv.Atoi(trip.GetTripId())
-						v.Trip = c.Specs.GetTrip(v.TripId, v.RouteId)
 
 						v.TripStartDate, _ = time.Parse("20060102", vehicle.Vehicle.GetTrip().GetStartDate())
 					}

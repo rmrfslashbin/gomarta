@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // service_id,date,exception_type
 // 34,20220530,1
 type CalendarDate struct {
-	ServiceId     int       `json:"service_id"`
-	Date          time.Time `json:"date"`
+	gorm.Model
+	ServiceId     int       `json:"service_id" gorm:"primaryKey"`
+	Date          time.Time `json:"date" gorm:"primaryKey"`
 	ExceptionType int       `json:"exception_type"`
 }
 

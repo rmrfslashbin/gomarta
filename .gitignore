@@ -1,4 +1,5 @@
 *.gob
+*.sqlite
 
 # Binaries for programs and plugins
 *.exe
