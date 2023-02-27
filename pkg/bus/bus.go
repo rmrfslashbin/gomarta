@@ -16,72 +16,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type Vehicle struct {
-	Id string
-
-	//EpochTimestamp  uint64
-	Timestamp       time.Time
-	OccupancyStatus string
-
-	Latitude  float32
-	Longitude float32
-	Bearing   float32
-	Speed     float32
-	Geohash   string
-
-	VehicleId    string
-	VehicleLabel string
-
-	TripId        int
-	RouteId       int
-	DirectionId   uint32
-	TripStartDate time.Time
-
-	CongestionLevel string
-	CurrentStatus   string
-
-	Agency *gtfspec.Agency
-	Route  *gtfspec.Route
-	Trip   *gtfspec.Trip
-}
-
-type Trip struct {
-	Id      string
-	Deleted bool
-
-	Delay     int32
-	Timestamp time.Time
-
-	StopTimeUpdate []*StopTimeUpdate
-
-	DirectionId uint32
-	RouteId     int
-	TripId      int
-	StartTime   string
-	StartDate   string
-
-	Vehicle *Vehicle
-}
-
-type StopTimeUpdate struct {
-	StopSequence uint32
-	StopId       int
-	Arrival      *Arrival
-	Departure    *Departure
-}
-
-type Arrival struct {
-	Delay       int32
-	Time        time.Time
-	Uncertainty int32
-}
-
-type Departure struct {
-	Delay       int32
-	Time        time.Time
-	Uncertainty int32
-}
-
 // Options for the bus instance
 type Option func(c *Bus)
 
@@ -157,12 +91,6 @@ type FetchInput struct {
 	Vehicles bool
 }
 
-// FetchOutput is the output for the Fetch method
-type FetchOutput struct {
-	Trips    []*Trip
-	Vehicles []*Vehicle
-}
-
 // Fetch gets the current requested data from the API.
 func (c *Bus) Fetch(input *FetchInput) (*FetchOutput, error) {
 	output := &FetchOutput{}
@@ -175,9 +103,10 @@ func (c *Bus) Fetch(input *FetchInput) (*FetchOutput, error) {
 		if trips, err := c.getData(c.TripsUrl); err != nil {
 			return nil, err
 		} else {
-			output.Trips = make([]*Trip, len(trips))
-			for ndx, trip := range trips {
+			output.Trips = make(map[string]*Trip, len(trips))
+			for _, trip := range trips {
 				t := &Trip{}
+				t.Raw = trip
 
 				t.Id = trip.GetId()
 				t.Deleted = trip.GetIsDeleted()
@@ -208,6 +137,7 @@ func (c *Bus) Fetch(input *FetchInput) (*FetchOutput, error) {
 
 						stu.StopSequence = stopTimeUpdate.GetStopSequence()
 						stu.StopId, _ = strconv.Atoi(stopTimeUpdate.GetStopId())
+						stu.Stop = c.Specs.Stops[stu.StopId]
 
 						arrival := stopTimeUpdate.GetArrival()
 						if arrival != nil {
@@ -230,7 +160,7 @@ func (c *Bus) Fetch(input *FetchInput) (*FetchOutput, error) {
 					}
 
 					tripDescriptor := tripUpdate.GetTrip()
-					if tripDescriptor == nil {
+					if tripDescriptor != nil {
 						t.DirectionId = tripDescriptor.GetDirectionId()
 						t.RouteId, _ = strconv.Atoi(tripDescriptor.GetRouteId())
 						t.TripId, _ = strconv.Atoi(tripDescriptor.GetTripId())
@@ -238,54 +168,61 @@ func (c *Bus) Fetch(input *FetchInput) (*FetchOutput, error) {
 						t.StartDate = tripDescriptor.GetStartDate()
 						t.StartTime = tripDescriptor.GetStartTime()
 
+						t.Route = c.Specs.Routes[t.RouteId]
+						t.Trip = c.Specs.Trips[t.RouteId][t.TripId]
+
 					}
 
+					/* Vehicle info isn't provided
 					vehicleDescriptor := tripUpdate.GetVehicle()
 					if vehicleDescriptor != nil {
 						vehicleDescriptor.GetId()
 						vehicleDescriptor.GetLabel()
 						vehicleDescriptor.GetLicensePlate()
 					}
+					*/
 				}
 
+				/* Vehicle info isn't provided
 				VehiclePosition := trip.GetVehicle()
+				t.Vehicle = &Vehicle{}
 				if VehiclePosition != nil {
-					t.Vehicle = &Vehicle{
-						CongestionLevel: VehiclePosition.GetCongestionLevel().String(),
-						CurrentStatus:   VehiclePosition.GetCurrentStatus().String(),
-					}
+					t.Vehicle.CongestionLevel = VehiclePosition.GetCongestionLevel().String()
+					t.Vehicle.CurrentStatus = VehiclePosition.GetCurrentStatus().String()
 
 					VehiclePosition.GetCurrentStopSequence()
-					occupancyStatus := VehiclePosition.GetOccupancyStatus().String()
+
+					t.Vehicle.OccupancyStatus = VehiclePosition.GetOccupancyStatus().String()
+
 					position := VehiclePosition.GetPosition()
 					if position != nil {
-						position.GetBearing()
-						position.GetLatitude()
-						position.GetLongitude()
-						position.GetOdometer()
-						position.GetSpeed()
+						t.Vehicle.Bearing = position.GetBearing()
+						t.Vehicle.Latitude = position.GetLatitude()
+						t.Vehicle.Longitude = position.GetLongitude()
+						t.Vehicle.Orometer = position.GetOdometer()
+						t.Vehicle.Speed = position.GetSpeed()
 					}
 
-					VehiclePosition.GetStopId()
-					VehiclePosition.GetTimestamp()
+					t.StopId, _ = strconv.Atoi(VehiclePosition.GetStopId())
+					t.Vehicle.Timestamp = time.Unix(int64(VehiclePosition.GetTimestamp()), 0)
 
 					vTripDescriptor := VehiclePosition.GetTrip()
 					if vTripDescriptor != nil {
-						vTripDescriptor.GetDirectionId()
-						vTripDescriptor.GetRouteId()
+						t.Vehicle.DirectionId = vTripDescriptor.GetDirectionId()
+						t.Vehicle.RouteId, _ = strconv.Atoi(vTripDescriptor.GetRouteId())
 						//vTripDescriptor.GetScheduleRelationship()
-						vTripDescriptor.GetStartDate()
-						vTripDescriptor.GetStartTime()
-						vTripDescriptor.GetTripId()
+						t.Vehicle.TripId, _ = strconv.Atoi(vTripDescriptor.GetTripId())
 					}
 					vVehicleDescriptor := VehiclePosition.GetVehicle()
 					if vVehicleDescriptor != nil {
-						vVehicleDescriptor.GetId()
-						vVehicleDescriptor.GetLabel()
-						vVehicleDescriptor.GetLicensePlate()
+						t.Vehicle.VehicleId = vVehicleDescriptor.GetId()
+						t.Vehicle.VehicleLabel = vVehicleDescriptor.GetLabel()
+						t.Vehicle.LicensePlate = vVehicleDescriptor.GetLicensePlate()
 					}
 
 				}
+				*/
+				output.Trips[t.Route.ShortName] = t
 			}
 		}
 	}

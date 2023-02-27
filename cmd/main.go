@@ -69,15 +69,18 @@ func (r *BusCmd) Run(ctx *Context) error {
 		break
 	}
 
-	for _, trip := range data.Trips {
-		//spew.Dump(trip)
-		//fmt.Println()
-
-		
-		}
-
-		break
+	if _, ok := data.Trips["37"]; ok {
+		spew.Dump(data.Trips["37"])
+	} else {
+		ctx.log.Error().Msg("no trips for route 37")
 	}
+	/*
+		for route, trip := range data.Trips {
+			fmt.Println(route)
+			spew.Dump(trip)
+			break
+		}
+	*/
 
 	return nil
 }
