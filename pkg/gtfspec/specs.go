@@ -109,6 +109,37 @@ func (s *Specs) AddTrip(tripData *TripData, trip *Trip) {
 	s.Trips[tripData.TripId][tripData.RouteId] = trip
 }
 
+func (s *Specs) GetAgency(agencyId string) *Agency {
+	if _, ok := s.Agencies[agencyId]; !ok {
+		return nil
+	}
+	return s.Agencies[agencyId]
+}
+
+func (s *Specs) GetRoute(routeId int) *Route {
+	if _, ok := s.Routes[routeId]; !ok {
+		return nil
+	}
+	return s.Routes[routeId]
+}
+
+func (s *Specs) GetStop(stopId int) *Stop {
+	if _, ok := s.Stops[stopId]; !ok {
+		return nil
+	}
+	return s.Stops[stopId]
+}
+
+func (s *Specs) GetTrip(tripId int, routeId int) *Trip {
+	if _, ok := s.Trips[tripId]; !ok {
+		return nil
+	}
+	if _, ok := s.Trips[tripId][routeId]; !ok {
+		return nil
+	}
+	return s.Trips[tripId][routeId]
+}
+
 // ToGobFile writes the Specs to a Gob file
 func (s *Specs) ToGOBFile(fpqn string) error {
 	fp, err := os.Create(fpqn)

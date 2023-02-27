@@ -28,11 +28,12 @@ type Context struct {
 
 // ConfigSetCmd sets a config value
 type BusCmd struct {
-	VehiclesUrl string `name:"vehiclesurl" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb" help:"URL for the Marta Bus Vehicles GTFS endpoint."`
-	TripsUrl    string `name:"tripsurl" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb" help:"URL for the Marta Bus Trips GTFS endpoint."`
-	Vehicles    bool   `name:"vehicles" group:"fetch" help:"Fetch the vehicles."`
-	Trips       bool   `name:"trips" group:"fetch" help:"Fetch the trips."`
-	Gob         string `name:"gob" default:"data.gob" help:"Output the specs as Gob to a file."`
+	VehiclesUrl string  `name:"vehiclesurl" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb" help:"URL for the Marta Bus Vehicles GTFS endpoint."`
+	TripsUrl    string  `name:"tripsurl" default:"https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb" help:"URL for the Marta Bus Trips GTFS endpoint."`
+	Vehicles    bool    `name:"vehicles" group:"fetch" help:"Fetch the vehicles."`
+	Trips       bool    `name:"trips" group:"fetch" help:"Fetch the trips."`
+	Gob         string  `name:"gob" default:"data.gob" help:"Output the specs as Gob to a file."`
+	Route       *string `name:"route" help:"Route to fetch. (ex: 37)"`
 }
 
 // Run is the entry point for the BusCmd command
@@ -64,23 +65,30 @@ func (r *BusCmd) Run(ctx *Context) error {
 		return err
 	}
 
-	for _, vehicle := range data.Vehicles {
-		spew.Dump(vehicle)
-		break
+	if r.Route != nil && data.Vehicles != nil {
+		if _, ok := data.Vehicles[*r.Route]; ok {
+			spew.Dump(data.Vehicles[*r.Route])
+		} else {
+			ctx.log.Error().Msgf("no vehicles for route %s", *r.Route)
+		}
+	} else if r.Vehicles {
+		for _, vehicle := range data.Vehicles {
+			spew.Dump(vehicle)
+		}
 	}
 
-	if _, ok := data.Trips["37"]; ok {
-		spew.Dump(data.Trips["37"])
-	} else {
-		ctx.log.Error().Msg("no trips for route 37")
-	}
-	/*
-		for route, trip := range data.Trips {
-			fmt.Println(route)
+	if r.Route != nil && data.Trips != nil {
+		if _, ok := data.Trips[*r.Route]; ok {
+			spew.Dump(data.Trips[*r.Route])
+		} else {
+			ctx.log.Error().Msgf("no trips for route %s", *r.Route)
+		}
+	} else if r.Trips {
+		for _, trip := range data.Trips {
 			spew.Dump(trip)
 			break
 		}
-	*/
+	}
 
 	return nil
 }

@@ -5,10 +5,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/mmcloughlin/geohash"
 	"github.com/rmrfslashbin/gomarta/pkg/gtfspec"
 	"github.com/rmrfslashbin/gomarta/pkg/gtfsrt"
@@ -113,7 +111,7 @@ func (c *Bus) Fetch(input *FetchInput) (*FetchOutput, error) {
 
 				alert := trip.GetAlert()
 				if alert != nil {
-					spew.Dump(alert)
+					c.log.Error().Msg("alert provided in trip data")
 					/*
 						alert.GetActivePeriod()
 						alert.GetCause().String()
@@ -168,8 +166,8 @@ func (c *Bus) Fetch(input *FetchInput) (*FetchOutput, error) {
 						t.StartDate = tripDescriptor.GetStartDate()
 						t.StartTime = tripDescriptor.GetStartTime()
 
-						t.Route = c.Specs.Routes[t.RouteId]
-						t.Trip = c.Specs.Trips[t.RouteId][t.TripId]
+						t.Route = c.Specs.GetRoute(t.RouteId)
+						t.Trip = c.Specs.GetTrip(t.TripId, t.RouteId)
 
 					}
 
@@ -235,71 +233,76 @@ func (c *Bus) Fetch(input *FetchInput) (*FetchOutput, error) {
 		if vehicles, err := c.getData(c.VehiclesUrl); err != nil {
 			return nil, err
 		} else {
-			output.Vehicles = make([]*Vehicle, len(vehicles))
-			for ndx, vehicle := range vehicles {
+			output.Vehicles = make(map[string]map[string]*Vehicle, len(vehicles))
+			for _, vehicle := range vehicles {
 				v := &Vehicle{}
+				v.Raw = vehicle
+				v.Id = vehicle.GetId()
+				v.Deleted = vehicle.GetIsDeleted()
 
-				v.Id = *vehicle.Id
+				vehicle.GetAlert()
 
-				//v.EpochTimestamp = vehicle.Vehicle.GetTimestamp()
-				v.OccupancyStatus = vehicle.Vehicle.GetOccupancyStatus().String()
+				vehiclePosition := vehicle.GetVehicle()
+				if vehiclePosition != nil {
+					v.CongestionLevel = vehiclePosition.GetCongestionLevel().String()
+					v.StopStatus = vehiclePosition.GetCurrentStatus().String()
+					v.CurrentStopSequence = vehiclePosition.GetCurrentStopSequence()
+					v.OccupancyStatus = vehiclePosition.GetOccupancyStatus().String()
+					v.Timestamp = time.Unix(int64(vehiclePosition.GetTimestamp()), 0)
 
-				if vehicle.Vehicle.GetPosition().Latitude != nil {
-					v.Latitude = *vehicle.Vehicle.GetPosition().Latitude
-				}
-				if vehicle.Vehicle.GetPosition().Longitude != nil {
-					v.Longitude = *vehicle.Vehicle.GetPosition().Longitude
-				}
-				if vehicle.Vehicle.GetPosition().Bearing != nil {
-
-					v.Bearing = *vehicle.Vehicle.GetPosition().Bearing
-				}
-				if vehicle.Vehicle.GetPosition().Speed != nil {
-					v.Speed = *vehicle.Vehicle.GetPosition().Speed
-				}
-
-				if v.Latitude != 0 && v.Longitude != 0 {
-					v.Geohash = geohash.Encode(float64(v.Latitude), float64(v.Longitude))
-				}
-
-				v.VehicleId = vehicle.Vehicle.GetVehicle().GetId()
-				v.VehicleLabel = vehicle.Vehicle.GetVehicle().GetLabel()
-
-				//v.TripId = vehicle.Vehicle.GetTrip().GetTripId()
-				//v.RouteId = vehicle.Vehicle.GetTrip().GetRouteId()
-
-				v.TripId, err = strconv.Atoi(vehicle.Vehicle.GetTrip().GetTripId())
-				if err != nil {
-					return nil, err
-				}
-				v.RouteId, err = strconv.Atoi(vehicle.Vehicle.GetTrip().GetRouteId())
-				if err != nil {
-					return nil, err
-				}
-
-				v.DirectionId = vehicle.Vehicle.GetTrip().GetDirectionId()
-				v.TripStartDate, err = time.Parse("20060102", vehicle.Vehicle.GetTrip().GetStartDate())
-				if err != nil {
-					return nil, err
-				}
-
-				v.Timestamp = time.Unix(int64(vehicle.Vehicle.GetTimestamp()), 0)
-
-				if _, ok := c.Specs.Trips[v.TripId]; ok {
-					if _, ok := c.Specs.Trips[v.TripId][v.RouteId]; ok {
-						v.Trip = c.Specs.Trips[v.TripId][v.RouteId]
+					position := vehiclePosition.GetPosition()
+					if position != nil {
+						v.Bearing = position.GetBearing()
+						v.Latitude = position.GetLatitude()
+						v.Longitude = position.GetLongitude()
+						v.Odometer = position.GetOdometer()
+						v.Speed = position.GetSpeed()
+						if v.Latitude != 0 && v.Longitude != 0 {
+							v.Geohash = geohash.Encode(float64(v.Latitude), float64(v.Longitude))
+						}
 					}
+
+					trip := vehiclePosition.GetTrip()
+					if trip != nil {
+						v.DirectionId = trip.GetDirectionId()
+						v.RouteId, _ = strconv.Atoi(trip.GetRouteId())
+						v.Route = c.Specs.GetRoute(v.RouteId)
+						v.Agency = c.Specs.GetAgency(v.Route.AgencyId) //c.Specs.Agencies[v.Route.AgencyId]
+
+						v.ScheduleRelationship = trip.GetScheduleRelationship().String()
+						v.StartDate = trip.GetStartDate()
+						v.StartTime = trip.GetStartTime()
+						v.TripId, _ = strconv.Atoi(trip.GetTripId())
+						v.Trip = c.Specs.GetTrip(v.TripId, v.RouteId)
+
+						v.TripStartDate, _ = time.Parse("20060102", vehicle.Vehicle.GetTrip().GetStartDate())
+					}
+
+					vehicleDescriptor := vehiclePosition.GetVehicle()
+					if vehicleDescriptor != nil {
+						v.VehicleId = vehicleDescriptor.GetId()
+						v.VehicleLabel = vehicleDescriptor.GetLabel()
+						v.LicensePlate = vehicleDescriptor.GetLicensePlate()
+					}
+
 				}
 
-				if _, ok := c.Specs.Routes[v.RouteId]; ok {
-					v.Route = c.Specs.Routes[v.RouteId]
-				}
+				/* Trip info isn't provided
+				tripUpdate := vehicle.GetTripUpdate()
+				if tripUpdate != nil {
+					tripUpdate.GetDelay()
+					time.Unix(int64(tripUpdate.GetTimestamp()), 0)
 
-				if strings.TrimSpace(v.Route.AgencyId) != "" {
-					v.Agency = c.Specs.Agencies[v.Route.AgencyId]
+					tripUpdate.GetTrip()
+					tripUpdate.GetVehicle()
+					tripUpdate.GetStopTimeUpdate()
 				}
+				*/
 
-				output.Vehicles[ndx] = v
+				if _, ok := output.Vehicles[v.Route.ShortName]; !ok {
+					output.Vehicles[v.Route.ShortName] = make(map[string]*Vehicle)
+				}
+				output.Vehicles[v.Route.ShortName][v.Id] = v
 			}
 		}
 	}
