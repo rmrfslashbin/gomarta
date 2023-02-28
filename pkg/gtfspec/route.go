@@ -23,32 +23,32 @@ type Route struct {
 	TextColor []uint8 `json:"route_text_color"`
 }
 
-func (r *Route) Add(record []string) error {
+func (r *Route) Add(headers map[string]int, record []string) error {
 	if len(record) != 9 {
 		return fmt.Errorf("invalid route record length: %d", len(record))
 	}
 
 	var err error
 
-	r.AgencyId = record[1]
-	r.ShortName = record[2]
-	r.LongName = record[3]
-	r.Desc = record[4]
-	r.Url = record[6]
+	r.AgencyId = record[headers["agency_id"]]
+	r.ShortName = record[headers["route_short_name"]]
+	r.LongName = record[headers["route_long_name"]]
+	r.Desc = record[headers["route_desc"]]
+	r.Url = record[headers["route_url"]]
 
-	r.RouteId, err = strconv.Atoi(record[0])
+	r.RouteId, err = strconv.Atoi(record[headers["route_id"]])
 	if err != nil {
 		return fmt.Errorf("route id: %v", err)
 	}
-	if r.RouteType, err = strconv.Atoi(record[5]); err != nil {
+	if r.RouteType, err = strconv.Atoi(record[headers["route_type"]]); err != nil {
 		return fmt.Errorf("route type: %v", err)
 	}
-	if color, err := hex.DecodeString(record[7]); err != nil {
+	if color, err := hex.DecodeString(record[headers["route_color"]]); err != nil {
 		return fmt.Errorf("route color: %v", err)
 	} else {
 		r.Color = color
 	}
-	if textColor, err := hex.DecodeString(record[8]); err != nil {
+	if textColor, err := hex.DecodeString(record[headers["route_text_color"]]); err != nil {
 		return fmt.Errorf("route text color: %v", err)
 	} else {
 		r.TextColor = textColor

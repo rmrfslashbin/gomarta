@@ -24,41 +24,41 @@ type Trip struct {
 	BikesAllowed bool   `json:"bikes_allowed"`
 }
 
-func (t *Trip) Add(record []string) error {
+func (t *Trip) Add(headers map[string]int, record []string) error {
 	if len(record) != 10 {
 		return fmt.Errorf("invalid trip record length: %d", len(record))
 	}
 
 	var err error
-	t.Headsign = strings.TrimSpace(record[3])
-	t.ShortName = strings.TrimSpace(record[4])
+	t.Headsign = strings.TrimSpace(record[headers["trip_headsign"]])
+	t.ShortName = strings.TrimSpace(record[headers["trip_short_name"]])
 
-	t.RouteId, err = strconv.Atoi(record[0])
+	t.RouteId, err = strconv.Atoi(record[headers["route_id"]])
 	if err != nil {
 		return fmt.Errorf("route id: %v", err)
 	}
-	t.TripID, err = strconv.Atoi(record[2])
+	t.TripID, err = strconv.Atoi(record[headers["trip_id"]])
 	if err != nil {
 		return fmt.Errorf("trip id: %v", err)
 	}
-	if t.ServiceId, err = strconv.Atoi(record[1]); err != nil {
+	if t.ServiceId, err = strconv.Atoi(record[headers["service_id"]]); err != nil {
 		return fmt.Errorf("service id: %v", err)
 	}
-	if t.BlockId, err = strconv.Atoi(record[5]); err != nil {
+	if t.BlockId, err = strconv.Atoi(record[headers["block_id"]]); err != nil {
 		return fmt.Errorf("block id: %v", err)
 	}
-	if t.DirectionId, err = strconv.Atoi(record[6]); err != nil {
+	if t.DirectionId, err = strconv.Atoi(record[headers["direction_id"]]); err != nil {
 		return fmt.Errorf("direction id: %v", err)
 	}
-	if t.ShapeId, err = strconv.Atoi(record[7]); err != nil {
+	if t.ShapeId, err = strconv.Atoi(record[headers["shape_id"]]); err != nil {
 		return fmt.Errorf("shape id: %v", err)
 	}
-	if strings.TrimSpace(record[8]) == "1" {
+	if strings.TrimSpace(record[headers["wheelchair_accessible"]]) == "1" {
 		t.Wheelchair = true
 	} else {
 		t.Wheelchair = false
 	}
-	if strings.TrimSpace(record[9]) == "1" {
+	if strings.TrimSpace(record[headers["bikes_allowed"]]) == "1" {
 		t.BikesAllowed = true
 	} else {
 		t.BikesAllowed = false

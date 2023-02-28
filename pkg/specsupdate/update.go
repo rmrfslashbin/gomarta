@@ -99,6 +99,8 @@ func (c *SpecsConfig) Update() error {
 			return &ErrCSVReader{Err: err}
 		}
 
+		headers := makeHeaders(csvData[0])
+
 		switch file.Name {
 		case "agency.txt":
 			c.log.Info().Msg("parsing agency.txt")
@@ -106,7 +108,8 @@ func (c *SpecsConfig) Update() error {
 
 			for _, row := range csvData[1:] {
 				agency := &gtfspec.Agency{}
-				if err := agency.Add(row); err != nil {
+
+				if err := agency.Add(headers, row); err != nil {
 					return &ErrParsingFile{Err: err, File: file.Name}
 				} else {
 					specs.Agencies = append(specs.Agencies, agency)
@@ -121,7 +124,7 @@ func (c *SpecsConfig) Update() error {
 			for _, row := range csvData[1:] {
 				calendar := &gtfspec.Calendar{}
 
-				if err := calendar.Add(row); err != nil {
+				if err := calendar.Add(headers, row); err != nil {
 					return &ErrParsingFile{Err: err, File: file.Name}
 				} else {
 					specs.Calendars = append(specs.Calendars, calendar)
@@ -135,7 +138,7 @@ func (c *SpecsConfig) Update() error {
 			for _, row := range csvData[1:] {
 				calendarDate := &gtfspec.CalendarDate{}
 
-				if err := calendarDate.Add(row); err != nil {
+				if err := calendarDate.Add(headers, row); err != nil {
 					return &ErrParsingFile{Err: err, File: file.Name}
 				}
 				specs.CalendarDates = append(specs.CalendarDates, calendarDate)
@@ -147,7 +150,7 @@ func (c *SpecsConfig) Update() error {
 
 			for _, row := range csvData[1:] {
 				route := &gtfspec.Route{}
-				if err := route.Add(row); err != nil {
+				if err := route.Add(headers, row); err != nil {
 					return &ErrParsingFile{Err: err, File: file.Name}
 				} else {
 					specs.Routes = append(specs.Routes, route)
@@ -160,7 +163,7 @@ func (c *SpecsConfig) Update() error {
 
 			for _, row := range csvData[1:] {
 				shape := &gtfspec.Shape{}
-				if err := shape.Add(row); err != nil {
+				if err := shape.Add(headers, row); err != nil {
 					return &ErrParsingFile{Err: err, File: file.Name}
 				} else {
 					specs.Shapes = append(specs.Shapes, shape)
@@ -173,7 +176,7 @@ func (c *SpecsConfig) Update() error {
 
 			for _, row := range csvData[1:] {
 				stopTime := &gtfspec.StopTime{}
-				if err := stopTime.Add(row); err != nil {
+				if err := stopTime.Add(headers, row); err != nil {
 					return &ErrParsingFile{Err: err, File: file.Name}
 				} else {
 					specs.StopTimes = append(specs.StopTimes, stopTime)
@@ -186,7 +189,7 @@ func (c *SpecsConfig) Update() error {
 
 			for _, row := range csvData[1:] {
 				stop := &gtfspec.Stop{}
-				if err := stop.Add(row); err != nil {
+				if err := stop.Add(headers, row); err != nil {
 					return &ErrParsingFile{Err: err, File: file.Name}
 				} else {
 					specs.Stops = append(specs.Stops, stop)
@@ -199,7 +202,7 @@ func (c *SpecsConfig) Update() error {
 
 			for _, row := range csvData[1:] {
 				trip := &gtfspec.Trip{}
-				if err := trip.Add(row); err != nil {
+				if err := trip.Add(headers, row); err != nil {
 					return &ErrParsingFile{Err: err, File: file.Name}
 				} else {
 					specs.Trips = append(specs.Trips, trip)
@@ -252,4 +255,14 @@ func readZipFile(zf *zip.File) ([]byte, error) {
 	}
 	defer f.Close()
 	return io.ReadAll(f)
+}
+
+func makeHeaders(headerRow []string) map[string]int {
+	headers := make(map[string]int)
+
+	for i, header := range headerRow {
+		headers[header] = i
+	}
+
+	return headers
 }

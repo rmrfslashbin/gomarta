@@ -19,17 +19,17 @@ type Agency struct {
 	FareUrl  string `json:"agency_fare_url"`
 }
 
-func (a *Agency) Add(record []string) error {
+func (a *Agency) Add(headers map[string]int, record []string) error {
 	if len(record) != 7 {
 		return fmt.Errorf("invalid agency record length: %d", len(record))
 	}
-	a.AgencyId = record[0]
-	a.Name = record[1]
-	a.Url = record[2]
-	a.Timezone = record[3]
-	a.Lang = record[4]
-	a.Phone = record[5]
-	a.FareUrl = record[6]
+	a.AgencyId = record[headers["agency_id"]]
+	a.Name = record[headers["agency_name"]]
+	a.Url = record[headers["agency_url"]]
+	a.Timezone = record[headers["agency_timezone"]]
+	a.Lang = record[headers["agency_lang"]]
+	a.Phone = record[headers["agency_phone"]]
+	a.FareUrl = record[headers["agency_fare_url"]]
 
 	return nil
 }

@@ -18,31 +18,31 @@ type Shape struct {
 	Distance float64 `json:"shape_dist_traveled"`
 }
 
-func (s *Shape) Add(record []string) error {
+func (s *Shape) Add(headers map[string]int, record []string) error {
 	if len(record) != 5 {
 		return fmt.Errorf("invalid shape record length: %d", len(record))
 	}
 
 	var err error
 
-	s.ShapeId, err = strconv.Atoi(record[0])
+	s.ShapeId, err = strconv.Atoi(record[headers["shape_id"]])
 	if err != nil {
 		return fmt.Errorf("shape id: %v", err)
 	}
 
-	s.Sequence, err = strconv.Atoi(record[3])
+	s.Sequence, err = strconv.Atoi(record[headers["shape_pt_sequence"]])
 	if err != nil {
 		return fmt.Errorf("shape sequence: %v", err)
 	}
 
-	if s.Lat, err = strconv.ParseFloat(record[1], 64); err != nil {
+	if s.Lat, err = strconv.ParseFloat(record[headers["shape_pt_lat"]], 64); err != nil {
 		return fmt.Errorf("shape lat: %v", err)
 	}
-	if s.Lon, err = strconv.ParseFloat(record[2], 64); err != nil {
+	if s.Lon, err = strconv.ParseFloat(record[headers["shape_pt_lon"]], 64); err != nil {
 		return fmt.Errorf("shape lon: %v", err)
 	}
 
-	if s.Distance, err = strconv.ParseFloat(record[4], 64); err != nil {
+	if s.Distance, err = strconv.ParseFloat(record[headers["shape_dist_traveled"]], 64); err != nil {
 		return fmt.Errorf("shape distance: %v", err)
 	}
 
