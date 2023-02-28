@@ -2,7 +2,11 @@ package main
 
 import (
 	"fmt"
+	"math"
+	"net/http"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/davecgh/go-spew/spew"
@@ -101,11 +105,41 @@ func (r *BusCmd) Run(ctx *Context) error {
 
 // UpdateSpecsCmd updates the GTFS feed specs
 type UpdateSpecsCmd struct {
-	Url string `name:"url" default:"https://itsmarta.com/google_transit_feed/google_transit.zip" help:"URL the GTFS feed spec zip file."`
+	Url   string `name:"url" default:"https://itsmarta.com/google_transit_feed/google_transit.zip" help:"URL the GTFS feed spec zip file."`
+	Check bool   `name:"check" help:"Get last update data."`
+}
+
+// prettyByteSize formats a byte size into a human readable format
+// https://gist.github.com/anikitenko/b41206a49727b83a530142c76b1cb82d?permalink_comment_id=4467913#gistcomment-4467913
+func prettyByteSize(b int) string {
+	bf := float64(b)
+	for _, unit := range []string{"", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"} {
+		if math.Abs(bf) < 1024.0 {
+			return fmt.Sprintf("%3.1f%sB", bf, unit)
+		}
+		bf /= 1024.0
+	}
+	return fmt.Sprintf("%.1fYiB", bf)
 }
 
 // Run is the entry point for the UpdateSpecsCmd command
 func (r *UpdateSpecsCmd) Run(ctx *Context) error {
+	if r.Check {
+		res, err := http.Head(r.Url)
+		if err != nil {
+			return err
+		}
+		if lastModifiedStr, ok := res.Header["Last-Modified"]; ok {
+			lastModified, _ := time.Parse(time.RFC1123, lastModifiedStr[0])
+			fmt.Printf("Last modified:  %s\n", lastModified)
+		}
+		if contentLengthStr, ok := res.Header["Content-Length"]; ok {
+			contentLength, _ := strconv.Atoi(contentLengthStr[0])
+			fmt.Printf("Content length: %s (%d bytes)\n", prettyByteSize(contentLength), contentLength)
+		}
+		return nil
+	}
+
 	db, err := database.New(
 		database.WithLogger(ctx.log),
 		database.WithSqlite(ctx.sqlite),
